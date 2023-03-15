@@ -554,22 +554,11 @@ class DiscordMinecraft:
 							embed.add_field(name=field_name,value=field_value)
 							await interaction.response.edit_message(view=None,embed=embed)
 				elif customid == "inactive_recovery_disapprove":
-					modal_title = self.bot.language.commands['recovery']['messages']['decline-modal-title']
-					modal = discord.ui.Modal(title=modal_title, custom_id = "inactive_recovery_disapprove")
-					label = self.bot.language.commands['recovery']['messages']['decline-modal-label']
-					placeholder = self.bot.language.commands['recovery']['messages']['decline-modal-placeholder']
-					modal.add_item(discord.ui.TextInput(max_length=512,label=label,style=discord.TextStyle.paragraph, placeholder=placeholder))
-					await interaction.response.send_modal(modal)
+					await interaction.response.send_modal(self.recovery_decline_modal())
 				elif customid == "registration_start_bedrock":
-					modal = discord.ui.Modal(title='Регистрация Bedrock Edition', custom_id = "registration_start_bedrock")
-					modal.add_item(discord.ui.TextInput(min_length=1,max_length=17,label="Ваш никнейм",style=discord.TextStyle.short, placeholder=f'Введите его сюда'))
-					modal.add_item(discord.ui.TextInput(min_length=1,max_length=17,label="Кто вас пригласил? (укажите ник)",style=discord.TextStyle.short,required=False, placeholder=f'Введите ник (необязательно)'))
-					await interaction.response.send_modal(modal)
+					await interaction.response.send_modal(self.bedrock_registration_modal())
 				elif customid == "registration_start_java":
-					modal = discord.ui.Modal(title='Регистрация Java Edition', custom_id = "registration_start_java")
-					modal.add_item(discord.ui.TextInput(min_length=3,max_length=16,label="Ваш никнейм",style=discord.TextStyle.short, placeholder=f'Введите его сюда'))
-					modal.add_item(discord.ui.TextInput(min_length=1,max_length=17,label="Кто вас пригласил? (укажите ник)",style=discord.TextStyle.short,required=False, placeholder=f'Введите ник (необязательно)'))
-					await interaction.response.send_modal(modal)
+					await interaction.response.send_modal(self.java_registration_modal())
 				elif customid == "registration_stage_open":
 					with self.bot.cursor() as cursor:
 						cursor.execute(f'SELECT stage FROM mc_registrations WHERE discordid={interaction.user.id} AND channelid={interaction.channel_id}')
@@ -615,9 +604,7 @@ class DiscordMinecraft:
 						else:
 							await self.on_registration_invalid_user(interaction)
 				elif customid == 'registration_disapprove':
-					modal = discord.ui.Modal(title='Отказ заявки', custom_id = "registration_disapprove")
-					modal.add_item(discord.ui.TextInput(max_length=256,label="Опишите причину отказа",style=discord.TextStyle.paragraph, placeholder=f'Шизик не сможет играть? Грустно.'))
-					await interaction.response.send_modal(modal)
+					await interaction.response.send_modal(self.registration_decline_modal())
 				elif customid == 'registration_approve':
 					with self.bot.cursor() as cursor:
 						cursor.execute(f'SELECT id,discordid, nick, uuid, channelid, referal FROM mc_registrations WHERE messageid={interaction.message.id}')
@@ -1132,6 +1119,33 @@ class DiscordMinecraft:
 			message = await self.bot.guild().get_channel(self.channel).send(content=content,embed=embed,view=view)
 			cursor.execute(f'INSERT INTO mc_inactive_recovery (discordid,messageid) VALUES ({member.id},{message.id})')
 
+	def bedrock_registration_modal(self):
+		moda_title = self.bot.language.commands['register']['messages']['registration-bedrock-modal-title']
+		modal = discord.ui.Modal(title=modal_title, custom_id = "registration_start_bedrock")
+		label = self.bot.language.commands['register']['messages']['registration-nick-input-label']
+		placeholder = self.bot.language.commands['register']['messages']['registration-nick-input-placeholder']
+		modal.add_item(discord.ui.TextInput(min_length=1,max_length=17,label=label,style=discord.TextStyle.short, placeholder=placeholder))
+		label = self.bot.language.commands['register']['messages']['registration-referal-input-label']
+		placeholder = self.bot.language.commands['register']['messages']['registration-referal-input-placeholder']
+		modal.add_item(discord.ui.TextInput(min_length=1,max_length=17,label=label,style=discord.TextStyle.short,required=False, placeholder=placeholder))
+		return modal
+	def java_registration_modal(self):
+		modal_title=self.bot.language.commands['register']['messages']['registration-java-modal-title']
+		modal = discord.ui.Modal(title=modal_title, custom_id = "registration_start_java")
+		label = self.bot.language.commands['register']['messages']['registration-nick-input-label']
+		placeholder = self.bot.language.commands['register']['messages']['registration-nick-input-placeholder']
+		modal.add_item(discord.ui.TextInput(min_length=3,max_length=16,label=label,style=discord.TextStyle.short, placeholder=placeholder))
+		label = self.bot.language.commands['register']['messages']['registration-referal-input-label']
+		placeholder = self.bot.language.commands['register']['messages']['registration-referal-input-placeholder']
+		modal.add_item(discord.ui.TextInput(min_length=1,max_length=17,label=label,style=discord.TextStyle.short,required=False, placeholder=placeholder))
+		return modal
+	def registration_decline_modal(self):
+		modal_title = self.bot.language.commands['recovery']['messages']['registration-decline-modal-title']
+		modal = discord.ui.Modal(title=modal_title, custom_id = "registration_disapprove")
+		label = self.bot.language.commands['recovery']['messages']['registration-decline-modal-label']
+		placeholder = self.bot.language.commands['recovery']['messages']['registration-decline-modal-placeholder']
+		modal.add_item(discord.ui.TextInput(max_length=512,label=label,style=discord.TextStyle.paragraph, placeholder=placeholder))
+		return modal
 	def recovery_questions(self):
 		recovery = self.stages['recovery']
 		size = len(recovery)
@@ -1142,6 +1156,13 @@ class DiscordMinecraft:
 		modal = discord.ui.Modal(title=modal_title, custom_id = "inactive_recovery_submit")
 		for question in self.recovery_questions():
 			modal.add_item(discord.ui.TextInput(min_length=question['min'],max_length=question['max'],label=question['label'],style=discord.TextStyle.paragraph, placeholder=question['placeholder']))
+		return modal
+	def recovery_decline_modal(self):
+		modal_title = self.bot.language.commands['recovery']['messages']['decline-modal-title']
+		modal = discord.ui.Modal(title=modal_title, custom_id = "inactive_recovery_disapprove")
+		label = self.bot.language.commands['recovery']['messages']['decline-modal-label']
+		placeholder = self.bot.language.commands['recovery']['messages']['decline-modal-placeholder']
+		modal.add_item(discord.ui.TextInput(max_length=512,label=label,style=discord.TextStyle.paragraph, placeholder=placeholder))
 		return modal
 
 	async def add_exception(self, nick: str, reason: str = None, seconds: int = 0, minutes: int = 0, hours: int = 0, days: int = 0, years: int = 0):
@@ -1161,8 +1182,7 @@ class DiscordMinecraft:
 				await member.add_roles(self.bot.guild().get_role(self.exception_role))
 				return member
 			return True
-		# запрос на сервер
-			
+		# запрос на сервер	
 	async def remove_exception(self, nick: str):
 		id = self.getJavaUUID(nick) if not nick.startswith('.') else getBedrockUUID(nick)
 		if not id:

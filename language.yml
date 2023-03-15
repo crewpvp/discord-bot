@@ -583,6 +583,18 @@ commands:
       # ${channel_name} - название канала
       # ${channel_link} - ссылка на канал
       registration-started: '{"embeds": [{"description": "Регистрация начата, перейдите в канал [${channel_name}](${channel_link})","color": 65280}]}'
+
+      registration-java-modal-title: 'Регистрация Java Edition'
+      registartion-bedrock-modal-title: 'Регистрация Bedrock Edition'
+      registration-nick-input-label: 'Ваш никнейм'
+      registration-nick-input-placeholder: 'Введите его сюда'
+      registration-referal-input-label: 'Кто вас пригласил? (укажите ник)'
+      registration-referal-input-placeholder: 'Введите ник (необязательно)'
+
+      registration-decline-modal-title: 'Отказ заявки'
+      registration-decline-modal-label: 'Опишите причину отказа'
+      registration-decline-modal-placeholder: 'Шизик не сможет играть? Грустно.'
+
   link:
     name: 'link'
     description: 'привязать второй аккаунт'
