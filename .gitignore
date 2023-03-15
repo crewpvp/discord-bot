@@ -1,0 +1,5 @@
+config.yml
+modules/__pycache__
+__pycache__
+chatgpt.json
+vkmemes.json

@@ -1,0 +1,566 @@
+command_groups:
+  premium: 'управление премиумом пользователей'
+  message: 'управление сообщениями от бота'
+  chatgpt: 'управление чат ботом'
+  profile: 'управление профилем'
+  tickets: 'управление тикетами'
+  registration: 'управление регистрацией'
+  #exception: 'управление исключениями с игрового сервера'
+  #unexception: 'управление исключениями с игрового сервера'
+  #referals: 'управление приглашенными участниками'
+commands:
+  nickcolor:
+    name: 'nickcolor' #как вызывается команда (/nickcolor <>)
+    description: 'изменить цвет своего никнейма'
+    arguments:
+      color: #аргумент цвета
+        rename: 'цвет'
+        describe: 'цвет ника'
+    messages:
+      # текст при смене ника. 
+      # ${color_name} будет изменено на выбранный цвет
+      color-set: '{"embeds": [{"description": "Цвет вашего ника изменен на ${color_name}","color": 65280}]}' 
+      # текст, когда не указан новый цвет (сброс цвета на стандарт)
+      color-reset: '{"embeds": [{"description": "Цвет вашего ника сброшен","color": 65280}]}' 
+  premium_give:
+    group: 'premium'
+    name: 'give'
+    description: 'выдать/добавить премиум на определенный период'
+    arguments:
+      member:
+        rename: 'пользователь'
+        describe: 'введенному пользователю Discord будет выдан премиум'
+      days:
+        rename: 'длительность'
+        describe: 'количество дней премиума (поддерживает дробные значения)'
+      reason:
+        rename: 'причина'
+        describe: 'причина по которой выдан премиум'
+        autocomplete:
+        - 'одобрение предложенной идеи'
+        - 'всяческая поддержка проекта в развитии'
+        - 'участие в событии'
+        - 'написание отзыва'
+    messages:
+      # текст добавляемый если причина есть
+      # ${reason} - причина указанная в команде
+      reason: ' по причине ${reason}'
+      # текст выдачи премиума
+      # ${user} - упоминание пользователя
+      # ${time} - время на сколько выдано
+      # ${reason} - причина выдачи
+      premium-given: '{"embeds": [{"description": "Пользователю ${user} был выдан премиум на ${time}${reason}","color": 65280}]}'
+  premium_remove:
+    group: 'premium'
+    name: 'remove'
+    description: 'отобрать леденец у ребенка'
+    arguments:
+      member:
+        rename: 'пользователь'
+        describe: 'введенный пользователь Discord будет попущен как петух на зоне'
+    messages:
+      # у пользователя не был найден премиум
+      # ${user} - упоминание пользователя
+      premium-not-found: '{"embeds": [{"description": "${user} и так нищета ебанная","color": 65280}]}'
+      # премиум был удален у пользователя
+      # ${user} - упоминание пользователя
+      premium-removed: '{"embeds": [{"description": "${user} получил хуй вместо леденца","color": 65280}]}'
+  message_sendraw:
+    group: 'message'
+    name: 'sendraw'
+    description: 'отправить сообщение созданное из JSON'
+    arguments:
+      content:
+        rename: 'json_текст'
+    messages:
+      message-sended: '{"embeds": [{"description": "Сообщение отправлено","color": 65280}]}'
+      parse-error: '{"embeds": [{"description": "Ошибка в обработке JSON, проверьте его на правильность","color": 16711680}]}'
+  message_raw:
+    group: 'message'
+    name: 'raw'
+    description: 'получить JSON из сообщения'
+    arguments:
+      id:
+        rename: 'id_сообщения'
+    messages:
+      incorrect-id-error: '{"embeds": [{"description": "Неверный ID сообщения","color": 16711680}]}'
+      message-not-found: '{"embeds": [{"description": "Сообщение с данным ID не найдено в канале","color": 16711680}]}'
+      context: 'Получить JSON из сообщения'
+  mute:
+    name: 'mute'
+    description: 'выдать буйного на определенный срок'
+    arguments:
+      member:
+        describe: 'введенному пользователю будет выдана роль буйный на период'
+        rename: 'пользователь'
+      days:
+        describe: 'количество дней буйного (поддерживает дробные значения)'
+        rename: 'длительность'
+      reason:
+        rename: 'причина'
+        describe: 'причина по которой выдан буйный'
+    messages:
+      # ${reason} - причина указанная при выполнении команды
+      reason: '\nПричина: ${reason}'
+      # ${user} - упоминание пользователя
+      # ${time} - время (50 секунд)
+      # ${reason} - причина , если она указана
+      user-muted: '{"embeds": [{"description": "${user} доставлен в изолятор на срок ${time}${reason}","color": 65280}]}'
+  unmute:
+    name: 'unmute'
+    description: 'помиловать раба божьего'
+    arguments:
+      member:
+        describe: 'введенный пользователь будет осовобожден от всех невзгод'
+        rename: 'пользователь'
+    messages:
+      # ${user} - упоминание пользователя
+      user-unmuted: '{"embeds": [{"description": "${user} отпустили все совершенные ранее грехи","color": 65280}]}'
+      user-not-muted: '{"embeds": [{"description": "${user} не имеет ни единого греха","color": 16711680}]}'
+  isolator:
+    name: 'isolator'
+    description: 'список буйных, время заточения в дурке и причины'
+    arguments:
+      page:
+        rename: 'страница'
+        describe: 'по указанному значению будет выведена информация'
+    messages:
+
+      # ${reason} - причина указанная при выполнении команды
+      reason: '\n**Причина изоляции:** ${reason}'
+      # ${time} - время в формате UNIX TIMESTAMP
+      # ${user} - упоминание пользователя
+      # ${reason} - причина, если она есть
+      # ${id} - номер пациента
+      mute-format: '{"name": "Пациент #${id}", "value": "${user} **будет выпущен** <t:${time}:R>${reason}"}'
+      # чем соединять mute-format
+      join-by: ','
+      # ${mutes} - список мутов в формате указанном выше
+      mute-list: '{"embeds": [{"title": "Состояние изолятора", "description": "Вот они, легенды комьюнити.\nВсего: ${count}","color": 65280,"fields":[${mutes}]}]}'
+      empty-mute-list: '{"embeds": [{"description": "Изолятор пуст, жаль.","color": 16711680}]}'
+  vote:
+    name: 'vote'
+    description: 'создать голосование'
+    arguments:
+      values:
+        describe: 'пункты голосования в формате [Текст пункта 1|пояснение][Текст пункта 2]'
+        rename: 'пункты'
+      min:
+        rename: 'минимум'
+        describe: 'минимальное количество выбранных пунктов'
+      max:
+        rename: 'максимум'
+        describe: 'максимальное количество выбранных пунктов'
+      hours:
+        rename: 'длительность'
+        describe: 'сколько часов проводится голосование (поддерживает дробные значения)'
+      placeholder:
+        describe: 'текст который будет внутри окна голосования изначально'
+        rename: 'заполнитель'
+    messages:
+      placeholder-length-error: '{"embeds": [{"description": "Максимальная длина текста-заполнителя: **150 символов**","color": 16711680}]}'
+      value-min-length-error: '{"embeds": [{"description": "Ошибка в пунктах, значение не может быть менее **3 символов**","color": 16711680}]}'
+      values-limit-error: '{"embeds": [{"description": "Максимальное количество пунктов: **25**","color": 16711680}]}'
+      values-value-amount-error: '{"embeds": [{"description": "В одном из пунктов указано три значения, допустимое количество: **2**","color": 16711680}]}'
+      value-not-found: '{"embeds": [{"description": "В одном из пунктов не указано значений","color": 16711680}]}'
+      value-max-length-error: '{"embeds": [{"description": "В пункте `${value}` превышен лимит символов: **100**","color": 16711680}]}'
+      # ${time} - время окончания в формате UNIX TIMESTAMP
+      vote-format: '{"embeds": [{"description": "Голосование закончится <t:${time}:R>","color": 65280}]}'
+      vote-created: '{"embeds": [{"description": "Голосование создано","color": 65280}]}'
+      no-vote-permission: '{"embeds": [{"description": "У вас недостаточно прав для участия в голосовании","color": 16711680}]}'
+      vote-not-found: '{"embeds": [{"description": "Голосование, в котором вы участвуете уже не существует","color": 16711680}]}'
+      on-vote: '{"embeds": [{"description": "Ваш голос записан. Вы сможете изменить его до конца голосования.","color": 65280}]}'
+      # ${description} - описание пункта , если оно есть
+      description: ' (${description})'
+      # ${description} - описание пункта , если оно есть
+      # ${label} - название пункта
+      # ${amount} - количество голосов
+      vote-voice-format: '{"name": "${label}${description}", "value": "Количество голосов: ${amount}"}'
+      join-by: ','
+      # ${start_time} - время начала голосования в формате UNIX TIME
+      # ${end_time} - время конца голосования в формате UNIX TIME
+      # ${voices} - список голосов в формате vote-voice-format
+      ended-vote-format: '{"embeds": [{"title": "Результаты голосования", "description": "Начато в <t:${start_time}:f>\nЗавершено в <t:${end_time}:f>","color": 65280,"fields":[${voices}]}]}'
+  chatgpt_updateconversation:
+    group: 'chatgpt'
+    name: 'updateconversation'
+    description: 'создать новый чат, может решить проблему долгих ответов/не работы бота'
+    messages:
+      conversation-updated: '{"embeds": [{"description": "Новый чат создан","color": 65280}]}'
+      error-on-conversation-update: '{"embeds": [{"description": "Чат не был создан, возможно какие-то проблемы на стороне OpenAI, попробуйте позже","color": 16711680}]}'
+  profile_age:
+    name: 'age'
+    description: 'установить/удалить возраст в профиле'
+    group: 'profile'
+    arguments:
+      age:
+        rename: 'возраст'
+        describe: 'оставьте пустым, чтобы скрыть'
+    messages:
+      age-hidden: '{"embeds": [{"description": "Ваш возраст скрыт","color": 65280}]}'
+      # ${age} - возраст указанный в команде
+      age-changed: '{"embeds": [{"description": "Ваш возраст изменен на ${age}","color": 65280}]}'
+  profile_name:
+    name: 'name'
+    description: 'установить/удалить имя в профиле'
+    group: 'profile'
+    arguments:
+      name:
+        rename: 'имя'
+        describe: 'оставьте пустым, чтобы скрыть'
+    messages:
+      name-hidden: '{"embeds": [{"description": "Ваше имя скрыто","color": 65280}]}'
+      # ${name} - имя указанное в команде
+      name-changed: '{"embeds": [{"description": "Ваше имя изменено на ${name}","color": 65280}]}'
+      max-length-error: '{"embeds": [{"description": "Максимальная длина имени **32 символа**","color": 16711680}]}'
+      min-length-error: '{"embeds": [{"description": "Минимальная длина имени **2 символа**","color": 16711680}]}'
+      incorrect-symbols-error: '{"embeds": [{"description": "Имя может быть написано на русском, украинском и английском языках","color": 16711680}]}'
+  profile_gender:
+    name: 'gender'
+    description: 'установить/удалить пол в профиле'
+    group: 'profile'
+    arguments:
+      gender:
+        rename: 'пол'
+        describe: 'оставьте пустым, чтобы скрыть'
+        choices:
+          'мужской': 0
+          'женский': 1
+    messages:
+      gender-hidden: '{"embeds": [{"description": "Ваш пол скрыт","color": 65280}]}'
+      # ${gender} - пол указанный в команде
+      gender-changed: '{"embeds": [{"description": "Ваше пол изменен на ${gender}","color": 65280}]}'
+  profile_reputation:
+    name: 'reputation'
+    group: 'profile'
+    description: 'установить пользователю репутацию'
+    arguments:
+      member:
+        rename: 'пользователь'
+      enum:
+        rename: 'значение'
+        description: 'оставьте пустым чтобы убрать значение'
+    messages:
+      
+      self-reputation-error: '{"embeds": [{"description": "Вы не можете установить репутацию себе","color": 16711680}]}'
+      # ${user} - упоминение пользователя, которому установили репутацию
+      reputation-reset: '{"embeds": [{"description": "Значение репутации для ${user} сброшено","color": 65280}]}'
+      # ${reputation} - значение репутации указанное в команде
+      positive-reputation: '{"embeds": [{"description": "${user} +${reputation}","color": 65280}]}'
+      negative-reputation: '{"embeds": [{"description": "${user} -${reputation}","color": 16711680}]}'
+  profile_me:
+    group: 'profile'
+    name: 'me'
+    description: 'показать ваш профиль'
+    arguments:
+      hide:
+        rename: 'скрывать_сообщение'
+        choices:
+          'нет': 0
+          'да': 1
+  profile_nick:
+    group: 'profile'
+    name: 'nick'
+    description: 'показать профиль пользователя по игровому нику'
+    arguments:
+      nickname:
+        rename: 'игровой_ник'
+      hide:
+        rename: 'скрывать_сообщение'
+        choices:
+          'нет': 0
+          'да': 1
+    messages:
+      user-leaved: '{"embeds": [{"description": "Пользователь покинул Discord сервер","color": 16711680}]}'
+      user-not-found: '{"embeds": [{"description": "Информации по данному нику не найдено","color": 16711680}]}'
+  profile_member:
+    group: 'profile'
+    name: 'member'
+    description: 'показать профиль пользователя'
+    arguments:
+      member:
+        rename: 'пользователь'
+      hide:
+        rename: 'скрывать_сообщение'
+        choices:
+          'нет': 0
+          'да': 1
+    messages:
+      # ${user}  - nick#tag запрошенного пользователя
+      embed-title: 'Профиль `${user}`'
+      # ${gender} - пол установленные в профиле
+      # ${name} - имя установленное в профиле
+      # ${age} - возраст установленный в профиле
+      personalinfo-field-name: 'Персональная информация'
+      woman-gender: 'Женский'
+      man-gender: 'Мужской'
+      gender-format: '**Пол:** ${gender}'
+      name-format: '**Имя:** ${name}'
+      age-format: '**Возраст:** ${age}'
+      # ${time} - время в изоляции в формате 15 секунд/минут..
+      in-isolator-format: '**Проведено в изоляции:** `${time}`'
+      # ${time} - время в формате UNIX TIME
+      isolator-ends-format: '**Изоляция окончится:** <t:${time}:R>'
+      
+      gameinfo-field-name: 'Игровая информация'
+      # ${subname} - ник если привязан второй аккаунт (Bedrock)
+      # ${nick} - игровой ник
+      subname-format: '(${subname})'
+      nick-format: '**Никнейм:** ${nick} ${subname}'
+      # ${time} - время в формате UNIX TIME
+      last-join-format: '**Был(а) онлайн:** <t:${time}:R>'
+      # ${time} - время в формате UNIX TIME
+      first-join-format: '**Регистрация:** <t:${time}:R>'
+      # ${time} - время в формате 15 секунд/минут..
+      time-played-format: '**Время игры:** ${time}' 
+      referal-word-1: 'человека'
+      referal-word-2: 'человека'
+      referal-word-3: 'человек'
+      # ${referals_count} - количество приглашенных
+      # ${referals_word} - приглашенных кого? Выше склонения для этого слова
+      referals-count-format: '**Пригласил(а):** ${referals_count} ${referals_word}'
+      
+      premium-field-name: 'Премиум'
+      # ${time} - время в формате UNIX TIME
+      premium-given-format: '**Получен:** <t:${time}:R>'
+      # ${time} - время в формате UNIX TIME
+      premium-ends-format: '**Истекает:** <t:${time}:R>'
+      
+      reputation-field-name: 'Репутация'
+
+      info-not-found: '{"embeds": [{"description": "Информации по данному пользователю не найдено","color": 16711680}]}'
+  ticket_button:
+    name: 'button'
+    group: 'tickets'
+    description: 'Создать кнопку создания тикетов'
+    arguments:
+      color:
+        rename: 'цвет'
+        choices:
+          'синяя': 1
+          'серая': 2
+          'зеленая': 3
+          'красня': 4
+      label:
+        rename: 'название'
+        description: 'максимальная длина 80 символов'
+    messages:
+      default-button-text: 'Создать тикет'
+      button-created: '{"embeds": [{"description": "Кнопка создания тикетов создана","color": 65280}]}'
+  ticket_active:
+    name: 'active'
+    group: 'tickets'
+    description: 'показать активные тикеты'
+    messages:
+      # ${id} - id тикета
+      # ${channel_link} - ссылка на канал тикета
+      # ${message_link} - ссылка на сообщение тикета
+      opened-ticket-format: '[Тикет #${id}](${message_link}): [открыт](${channel_link})'
+      unaswered-ticket-format: '[Тикет #${id}](${message_link})'
+      join-by: '\n'
+      # ${tickets} - список тикетов
+      active-tickets: '{"embeds": [{"title":"Активные тикеты", "description": "${tickets}","color": 65280}]}'
+
+      no-active-tickets: '{"embeds": [{"description": "Активные тикеты отсутствуют","color": 16711680}]}'
+  ticket_pardon:
+    group: 'tickets'
+    name: 'pardon'
+    description: 'разблокировать пользователя'
+    arguments:
+      member:
+        rename: 'пользователь'
+    messages:
+      # ${user} - упоминание пользователя
+      user-pardonned: '{"embeds": [{"description": "Пользователь ${user} снова может засирать мозги админам своей хуйней","color": 65280}]}'
+      user-not-banned: '{"embeds": [{"description": "Пользователь не имеет блокировки создания тикетов","color": 65280}]}'
+  ticket_create:
+    name: 'ticket'
+    description: 'создать тикет'
+    arguments:
+      text:
+        rename: 'текст_проблемы'
+    messages:
+      accept-button-label: 'Принять тикет'
+      decline-button-label: 'Закрыть тикет'
+      block-button-label: 'Заблокировать автора'
+      accept-button-color: 1
+      decline-button-color: 4
+      block-button-color: 3
+
+      # ${user} - упоминание пользователя создавшего тикет
+      # ${id} - id созданного тикета
+      # ${text} - текст тикета
+      ticket-embed-title-format: 'Тикет #${id}'
+      ticket-embed-description-format: '${text}'
+      ticket-content-format: 'Создан пользователем ${user}'
+
+      ticket-created: '{"embeds": [{"description": "Тикет создан, в случае принятия будет создан отдельный канал","color": 65280}]}'
+
+      # ${time} - время разбана в формате UNIX TIME
+      ticket-banned-error: '{"embeds": [{"description": "Вы сможеет создать новый тикет <t:${time}:R>","color": 16711680}]}'
+      ticket-limit-error: '{"embeds": [{"description": "У вас достигнут лимит созданных тикетов, ожидайте ответа","color": 16711680}]}'
+
+      no-ticket-permission: '{"embeds": [{"description": "У вас недостаточно прав для взаимодействия с тикетами","color": 16711680}]}'
+
+      # ${time} - время в формате UNIX TIME
+      # ${user} - упоминание пользователя, который ответил на тикет
+      ticket-closed-field-name: 'Закрыт <t:${time}:R>'
+      ticket-closed-field-value: '${user}'
+
+      ticket-accepted-field-name: 'Принят <t:${time}:R>'
+      ticket-accepted-field-value: '${user}'
+
+      user-blocked-field-name: 'Заблокировал автора на день <t:${time}:R>'
+      user-blocked-field-value: '${user}'
+
+      ticket-author-leaved-field-name: 'Тикет закрыт <t:${time}:R>'
+      ticked-author-leaved-field-value: 'Автор тикета покинул Discord сервер'
+
+      # ${channel_link} - ссылка на созданный канал
+      ticket-accepted: '{"embeds": [{"description": "Тикет принят, перейдите в [канал](${channel_link})","color": 65280}]}'
+
+      # ${time} - среднее время ответа в формате 15 секунд/минут..
+      average-time-format: 'Среднее время ответа ${time}'
+      form-title: 'Создание тикета'
+      form-label: 'Опишите вашу проблему'
+      form-placeholder: '${time}'
+  registration_startbuttons:
+    group: 'registration'
+    name: 'startbuttons'
+    description: 'Создать кнопки для начала регистрации'
+    arguments:
+      bedrock_label:
+        rename: 'название_bedrock'
+        description: 'максимальная длина 80 символов'
+      java_label:
+        rename: 'название_java'
+        description: 'максимальная длина 80 символов'
+      bedrock_color:
+        rename: 'цвет_bedrock'
+        choices:
+          'синяя': 1
+          'серая': 2
+          'зеленая': 3
+          'красня': 4
+      java_color:
+        rename: 'цвет_java'
+        choices:
+          'синяя': 1
+          'серая': 2
+          'зеленая': 3
+          'красня': 4
+    messages:
+      default-bedrock-text: 'Bedrock Edition'
+      default-java-text: 'Java Edition'
+      buttons-created: '{"embeds": [{"description": "Кнопки начала регистрации созданы","color": 65280}]}'
+  registration_recoverybutton:
+    group: 'registration'
+    name: 'recoverybutton'
+    description: 'Создать кнопку начала восстановления аккаунта'
+    arguments:
+      color:
+        rename: 'цвет'
+        choices:
+          'синяя': 1
+          'серая': 2
+          'зеленая': 3
+          'красня': 4
+      label:
+        rename: 'название'
+        description: 'максимальная длина 80 символов'
+    messages:
+      default-button-text: 'Восстановить аккаунт'
+      button-created: '{"embeds": [{"description": "Кнопка начала восстановления аккаунта создана","color": 65280}]}'
+  recovery:
+    name: 'recovery'
+    description: 'восстановить аккаунт'
+    messages:
+      active-recovery-exists: '{"embeds": [{"description": "У вас уже есть активная заявка на восстановление аккаунта","color": 16711680}]}'
+      account-not-found: '{"embeds": [{"description": "Ваш аккаунт не найден в списке инактива","color": 16711680}]}'
+      recovery-modal-title: 'Восстановление аккаунта'
+
+      # ${subname} - ник если привязан второй аккаунт (Bedrock)
+      # ${nick} - игровой ник
+      subname-format: ' (${subname})'
+      nick-format: '**Никнейм:** ${nick}${subname}\n'
+      # ${time} - время в формате UNIX TIME
+      last-join-format: '**Был(а) онлайн:** <t:${time}:R>\n'
+      # ${time} - время в формате UNIX TIME
+      first-join-format: '**Регистрация:** <t:${time}:R>\n'
+      # ${time} - время в формате 15 секунд/минут..
+      time-played-format: '**Время игры:** ${time}\n' 
+      # ${user} - упоминание Discord аккаунта
+
+      user-format: '**Discord аккаунт:** ${user}\n'
+      # ${raw_nick} - ник пользователя
+      # ${raw_user} - упоминание пользователя
+      # ${user} - упоминание по формату
+      # ${nick} - ник по формату
+      # остальное - поля по формату
+      embed-title: 'Заявка от ${raw_nick}'
+      embed-description: '${nick}${user}${first_join}${last_join}${time_played}'
+      content: ''
+
+      accept-button-label: 'Одобрить'
+      accept-button-color: 3
+      decline-button-label: 'Отклонить'
+      decline-button-color: 4
+
+      # ${time} - среднее время обработки в формате 15 минут/секунд..
+      average-time-format: '\nСреднее время обработки заявки ${time}'
+      dm-create-message: '{"embeds": [{"title":"Восстановление crewpvp.xyz","description": "Заявка на восстановление создана.\nОжидайте решение модерации${time}","color": 65280}]}'
+      response-create-message: '{"embeds": [{"description": "Заявка на восстановление создана.\nОжидайте решение модерации${time}","color": 65280}]}'
+
+      # ${time} - время в формате UNIX TIME
+      # ${user} - упоминание пользователя, который ответил на тикет
+      declined-field-name: 'Отклонено <t:${time}:R>'
+      declined-field-value: '${user}'
+
+      accepted-field-name: 'Одобрено <t:${time}:R>'
+      declined-reason-format: ' по причине ${reason}'
+      recovery-accepted-field-value: '${user}${reason}'
+
+      dm-accepted-message: '{"embeds": [{"title":"Восстановление crewpvp.xyz","description": "Ваша заявка была одобрена! Приятной игры!","color": 65280}]}'
+      # ${reason} - причина указанная в отклонении
+      dm-declined-reason-format: '\n По причине ${reason}'
+      dm-declined-message: '{"embeds": [{"title":"Восстановление crewpvp.xyz","description": "Ваша заявка была отклонена!${reason}","color": 65280}]}'
+
+  authorize:
+    name: 'authorize'
+    description: 'авторизовать игровой аккаунт'
+    messages:
+      not-registered: '{"embeds": [{"description": "Вы не зарегистрированны на игровом сервере","color": 16711680}]}'
+      not-on-server: '{"embeds": [{"description": "Вы должны находиться на сервере чтобы авторизоваться","color": 16711680}]}'
+      authorized: '{"embeds": [{"description": "Вы успешно авторизованы","color": 65280}]}'
+  logout:
+    name: 'logout'
+    description: 'выйти с игрового аккаунта'
+    messages:
+      not-registered: '{"embeds": [{"description": "Вы не зарегистрированны на игровом сервере","color": 16711680}]}'
+      not-logged: '{"embeds": [{"description": "Вы и так не авторизованны","color": 16711680}]}'
+      unlogon: '{"embeds": [{"description": "Вы успешно вышли с игрового аккаунта","color": 65280}]}'
+  authcode:
+    name: 'authcode'
+    description: 'получить одноразовый код для входа в аккаунт'
+    arguments:
+      minutes:
+        name: 'длительность'
+        describe: 'время работы одноразового кода в минутах'
+    messages:
+      not-registered: '{"embeds": [{"description": "Вы не зарегистрированны на игровом сервере","color": 16711680}]}'
+      # ${code} - одноразовый код пользователя
+      # ${time} - время его истечения в формает UNIX TIME
+      code-sended: '{"embeds": [{"description": "Ваш одноразовый код для входа на игровой аккаунт: ||${code}||\nДействительность кода истекает <t:${time}:R>","color": 65280}]}'
+  #register:
+  #link:
+  #unlink:
+  #shizotop:
+  #exception_nick:
+  #exception_member:
+  #unexception_nick:
+  #unexception_member:
+  #exceptions:
+  #referals_top:
+  #referals_mine:
+
+
