@@ -7,7 +7,7 @@ command_groups:
   registration: 'управление регистрацией'
   #exception: 'управление исключениями с игрового сервера'
   #unexception: 'управление исключениями с игрового сервера'
-  #referals: 'управление приглашенными участниками'
+  referals: 'управление приглашенными участниками'
 commands:
   nickcolor:
     name: 'nickcolor' #как вызывается команда (/nickcolor <>)
@@ -627,8 +627,8 @@ commands:
       # ${time} - время игры в формате 15 минут/секунд
       # ${user} - упоминание пользователя
       # ${nick} - ник игрока
-      user-format: ' ({user})'
-      player-format: '**{nick}**{user}: `{time}`'
+      user-format: ' (${user})'
+      player-format: '**${nick}**${user}: `${time}`'
       # чем соединять player-format
       join-by: '\n'
       # ${players} - список игроков в формате указанном выше
@@ -639,7 +639,40 @@ commands:
   #unexception_nick:
   #unexception_member:
   #exceptions:
-  #referals_top:
-  #referals_mine:
-
+  referals_top:
+    name: 'top'
+    group: 'referals'
+    description: 'топ приглашенцев'
+    arguments:
+      page:
+        rename: 'страница'
+    messages:
+      # ${time} - время игры в формате 15 минут/секунд
+      # ${user} - упоминание пользователя
+      # ${nick} - ник игрока
+      user-format: ' (${user})'
+      player-format: '**${nick}**${user}: **${count}**'
+      # чем соединять player-format
+      join-by: '\n'
+      # ${players} - список игроков в формате указанном выше
+      referals-list: '{"embeds": [{"title": "Топ приглашений", "description": "У них похоже много друзей, не так-ли?\n\n${players}","color": 65280}]}'
+      empty-referals-list: '{"embeds": [{"description": "Никто никого не приглашал. Грусть.","color": 16711680}]}'
+  referals_mine:
+    name: 'mine'
+    group: 'referals'
+    description: 'список приглашенных вами игроков'
+    arguments:
+      page:
+        rename: 'страница'
+    messages:
+      # ${user} - упоминание пользователя
+      # ${nick} - ник игрока
+      user-format: ' (${user})'
+      player-format: '**${nick}**${user}'
+      # чем соединять player-format
+      join-by: '\n'
+      # ${players} - список игроков в формате указанном выше
+      # ${count} - количество приглашенных
+      referals-list: '{"embeds": [{"title": "Ваши ~~поклонники~~ приглашенцы)", "description": "Всего: ${count}\n\n${players}","color": 65280}]}'
+      empty-referals-list: '{"embeds": [{"description": "Похоже у вас нету поклонников, но вы можете это исправить.\nПопросите указать ваш игровой ник при регистрации\nВы и ваш товарищ получите премиум","color": 16711680}]}'
 

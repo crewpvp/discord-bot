@@ -367,11 +367,11 @@ class DiscordMinecraft:
 					player = Template(self.bot.language.commands['shizotop']['messages']['player-format']).safe_substitute(user=user,time=relativeTimeParser(time_played),nick=nick)
 				else:
 					player = Template(self.bot.language.commands['shizotop']['messages']['player-format']).safe_substitute(user='',time=relativeTimeParser(time_played),nick=nick)
-			l = '\n'.join(l)
+				l.append(player)
+			l = (self.bot.language.commands['shizotop']['messages']['join-by']).join(l)
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['shizotop']['messages']['shizo-list']).safe_substitute(players=l))
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
 			
-
 		self.exception_group = app_commands.Group(name="exception", description="Управление исключениями с сервера")
 		
 		@self.exception_group.command(name="nick", description="Исключить малого по нику на промежуток времени")
@@ -463,61 +463,62 @@ class DiscordMinecraft:
 			embed = discord.Embed(description = f'Исключенные не найдены.',colour = discord.Colour.red())
 			await interaction.response.send_message(embed=embed,ephemeral=True)
 
-		self.referals_group = app_commands.Group(name="referals", description="О, это же реферальная система?")
-
-		@self.referals_group.command(name="top", description="Топ пользователей, пригласивших больше всего людей")
-		@app_commands.describe(page='по указанному значению будет выведена информация')
-		@app_commands.rename(page='страница')
+		command_init = self.bot.language.commands['referals_top']['init']
+		@command_init.command(**self.bot.language.commands['referals_top']['initargs'])
+		@app_commands.describe(**self.bot.language.commands['referals_top']['describe'])
+		@app_commands.rename(**self.bot.language.commands['referals_top']['rename'])
 		async def command_referals_top(interaction: discord.Interaction, page: int = 1):
 			page = 1 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
-				cursor.execute(f'SELECT r.user,a.nick,COUNT(r.referal) as cnt FROM mc_referals AS r JOIN mc_accounts AS a ON a.discordid=r.user GROUP BY user ORDER BY cnt DESC LIMIT {page},25')
-				referals = cursor.fetchall()
-			if referals:
-				
-				l = []
-				for discordid,nick,count in referals:
-					user = interaction.guild.get_member(discordid)
-					nick = f' (**'+nick.replace('_','\\_')+'**)' if nick else ''
-					if user:
-						l.append(f'{user.mention}{nick}: **{count}**')
-				l = '\n'.join(l)
-				embed = discord.Embed(title= 'Топ приглашений',description = f'У них похоже много друзей, не так-ли?\n\n{l}',colour = discord.Colour.green())
-				await interaction.response.send_message(embed=embed,ephemeral=False)
+				cursor.execute(f'SELECT a.nick,r.user,COUNT(r.referal) as cnt FROM mc_referals AS r JOIN mc_accounts AS a ON a.discordid=r.user GROUP BY user ORDER BY cnt DESC LIMIT {page*25},25')
+				players = cursor.fetchall()
+			if not players:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['referals_top']['messages']['empty-referals-list'])
+				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				return
-			embed = discord.Embed(description = f'Никто никого не приглашал, грусть (х2).',colour = discord.Colour.red())
-			await interaction.response.send_message(embed=embed,ephemeral=True)
+			l = []
+			for nick,discordid,count in players:
+				user = interaction.guild.get_member(discordid)
+				nick = nick.replace('_','\\_')
+				if user:
+					user = Template(self.bot.language.commands['referals_top']['messages']['user-format']).safe_substitute(user=user.mention)
+					player = Template(self.bot.language.commands['referals_top']['messages']['player-format']).safe_substitute(count=count,user=user,nick=nick)
+				else:
+					player = Template(self.bot.language.commands['referals_top']['messages']['player-format']).safe_substitute(count=count,user='',nick=nick)
+				l.append(player)
+			l = (self.bot.language.commands['referals_top']['messages']['join-by']).join(l)
+			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['referals_top']['messages']['referals-list']).safe_substitute(count=count,players=l))
+			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
 		
-		@self.referals_group.command(name="mine", description="Пользователи, которых вы пригласили")
-		@app_commands.describe(page='по указанному значению будет выведена информация')
-		@app_commands.rename(page='страница')
+		command_init = self.bot.language.commands['referals_mine']['init']
+		@command_init.command(**self.bot.language.commands['referals_mine']['initargs'])
+		@app_commands.describe(**self.bot.language.commands['referals_mine']['describe'])
+		@app_commands.rename(**self.bot.language.commands['referals_mine']['rename'])
 		async def command_referals_mine(interaction: discord.Interaction, page: int = 1):
 			page = 1 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
-				cursor.execute(f'SELECT nick,discordid FROM mc_referals JOIN mc_accounts ON discordid=referal WHERE user={interaction.user.id} LIMIT {page},25')
-				referals = cursor.fetchall()
-			if referals:
-				l = []
-				for nick,discordid in referals:
-					user = interaction.guild.get_member(discordid)
-					nick = f' (**'+nick.replace('_','\\_')+'**)' if nick else ''
-					if user:
-						l.append(f'{user.mention}{nick}')
-				l = '\n'.join(l)
-				embed = discord.Embed(
-					title= 'Ваши ~~поклонники~~ приглашенцы)',
-					description = f'Всего: {len(referals)}\n\n{l}',
-					colour = discord.Colour.green()
-				)
-				await interaction.response.send_message(embed=embed,ephemeral=True)
+				cursor.execute(f'SELECT nick,discordid FROM mc_referals JOIN mc_accounts ON discordid=referal WHERE user={interaction.user.id} LIMIT {page*25},25')
+				players = cursor.fetchall()
+				cursor.execute(f'SELECT COUNT(*) FROM mc_referals WHERE user={interaction.user.id}')
+				count = cursor.fetchone()[0]
+			if not players:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['referals_mine']['messages']['empty-referals-list'])
+				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				return
-			embed = discord.Embed(
-				description = f'Похоже у вас нету поклонников, но вы можете это исправить.\nПопросите указать ваш игровой ник при регистрации\nВы и ваш товарищ получите премиум',
-				colour = discord.Colour.red()
-				)
-			await interaction.response.send_message(embed=embed,ephemeral=True)
+			l = []
+			for nick,discordid in players:
+				user = interaction.guild.get_member(discordid)
+				nick = nick.replace('_','\\_')
+				if user:
+					user = Template(self.bot.language.commands['referals_mine']['messages']['user-format']).safe_substitute(user=user.mention)
+					player = Template(self.bot.language.commands['referals_mine']['messages']['player-format']).safe_substitute(user=user,nick=nick)
+				else:
+					player = Template(self.bot.language.commands['referals_mine']['messages']['player-format']).safe_substitute(user='',nick=nick)
+				l.append(player)
+			l = (self.bot.language.commands['referals_mine']['messages']['join-by']).join(l)
+			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['referals_mine']['messages']['referals-list']).safe_substitute(count=count,players=l))
+			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		bot.tree.add_command(self.referals_group, guild = self.bot.guild_object())
 
 		async def interaction(interaction: discord.Interaction):
 			if interaction.type == discord.InteractionType.component:
