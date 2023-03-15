@@ -152,64 +152,71 @@ class DiscordMinecraft:
 				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['authcode']['messages']['code-sended']).safe_substitute(time=code_time,code=code))
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		@bot.tree.command(name="register", description="Начать регистрацию", guild = self.bot.guild_object())
-		@app_commands.choices(environment=[app_commands.Choice(name='java edition', value=0),app_commands.Choice(name='bedrock edition', value=1)])
-		@app_commands.describe(environment='Редакция игры с которой вы играете')
-		@app_commands.rename(environment='версия_игры')
-		@app_commands.describe(nick='Ваш игровой ник')
-		@app_commands.rename(nick='никнейм')
-		@app_commands.describe(referal='Ник пригласившего человека')
-		@app_commands.rename(referal='пригласивший')
+		command_init = self.bot.language.commands['register']['init']
+		@command_init.command(**self.bot.language.commands['register']['initargs'])
+		@app_commands.choices(**self.bot.language.commands['register']['choices'])
+		@app_commands.describe(**self.bot.language.commands['register']['describe'])
+		@app_commands.rename(**self.bot.language.commands['register']['rename'])
 		async def command_register(interaction: discord.Interaction, environment: app_commands.Choice[int], nick:str, referal: str = None):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id FROM mc_accounts WHERE discordid={interaction.user.id}')
 				if cursor.fetchone():
-					await self.on_already_registered(interaction)
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['nick-already-registered'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
 				cursor.execute(f'SELECT id FROM mc_registrations WHERE discordid={interaction.user.id} AND closed IS NULL')
 				if cursor.fetchone():
-					await self.on_registration_exists(interaction)
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['active-registration-exists'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
-
 				cursor.execute(f'SELECT closed+{self.cooldown} FROM mc_registrations WHERE discordid={interaction.user.id} AND closed+{self.cooldown} > UNIX_TIMESTAMP()')
 				time = cursor.fetchone()
 				if time:
-					await self.on_registration_cooldown(interaction,time[0])
+					content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['registration-cooldown']).safe_substitute(time=time[0]))
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
 				if referal:
 					if not (referal:=self.fetchDiscordByNick(referal)):
-						await self.on_incorrect_referal(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['referal-not-found'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 
 				if environment.value == 1:
 					if not re.match("^\.?[A-Za-z][A-Za-z0-9]{0,11}[0-9]{0,4}",nick) is not None:
-						await self.on_incorrect_nick(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['incorrect-bedrock-nick'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					if not (uuid:=self.getBedrockUUID(nick[1:] if nick.startswith('.') else nick)):
-						await self.on_incorrect_nick(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['incorrect-bedrock-nick'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					cursor.execute(f'SELECT bedrockId FROM LinkedPlayers WHERE bedrockId=UNHEX(REPLACE(\'{uuid}\', \'-\', \'\'))')
 					if cursor.fetchone():
-						await self.on_registration_exists(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['registration-exists'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					if not nick.startswith("."):
 						nick = "."+nick
 					cursor.execute(f'SELECT id FROM mc_accounts WHERE discordid={interaction.user.id}')
 					if cursor.fetchone():
-						await self.on_already_registered(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['already-registered'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 				else:
 					if not re.match("[A-Za-z_0-9]{3,16}", nick) is not None:
-						await self.on_incorrect_nick(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['incorrect-java-nick'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					uuid = self.getJavaUUID(nick)
 				cursor.execute(f'SELECT id FROM mc_accounts WHERE id=\'{uuid}\'')
 				if cursor.fetchone():
-					await self.on_nick_already_registered(interaction)
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['already-registered'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
 				cursor.execute(f'SELECT id FROM mc_registrations WHERE uuid=\'{uuid}\' AND closed IS NULL')
 				if cursor.fetchone():
-					await self.on_nick_already_registered(interaction)
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['already-registered'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
 				category = interaction.guild.get_channel(self.category)
 				overwrites = {
@@ -227,7 +234,6 @@ class DiscordMinecraft:
 				else:
 					content,embeds,component = self.parseQuestions(start_stage)
 				await channel.send(content = content, embeds = embeds, view = component)
-				await self.on_registration_start(interaction, channel)
 
 		command_init = self.bot.language.commands['link']['init']
 		@command_init.command(**self.bot.language.commands['link']['initargs'])
@@ -339,29 +345,32 @@ class DiscordMinecraft:
 					else:
 						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		@bot.tree.command(name="shizotop", description="Топ шизов без личной жизни", guild = self.bot.guild_object())
-		@app_commands.describe(page='по указанному значению будет выведена информация')
-		@app_commands.rename(page='страница')
+		command_init = self.bot.language.commands['shizotop']['init']
+		@command_init.command(**self.bot.language.commands['shizotop']['initargs'])
+		@app_commands.describe(**self.bot.language.commands['shizotop']['describe'])
+		@app_commands.rename(**self.bot.language.commands['shizotop']['rename'])
 		async def command_shizotop(interaction: discord.Interaction, page: int = 1):
 			page = 1 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
-				cursor.execute(f'SELECT nick,discordid,time_played FROM mc_accounts ORDER BY time_played DESC LIMIT {page},25')
+				cursor.execute(f'SELECT nick,discordid,time_played FROM mc_accounts ORDER BY time_played DESC LIMIT {page*25},25')
 				players = cursor.fetchall()
-			if players:
-				l = []
-				for nick,discordid,time_played in players:
-					user = interaction.guild.get_member(discordid)
-					nick = nick.replace('_','\\_')
-					if user:
-						l.append(f'**{nick}** ({user.mention}): `{relativeTimeParser(time_played)}`')
-					else:
-						l.append(f'**{nick}**: `{relativeTimeParser(time_played)}`')
-				l = '\n'.join(l)
-				embed = discord.Embed(title= 'Топ шизов',description = f'Личная шизнь вышла из чата\n\n{l}',colour = discord.Colour.green())
-				await interaction.response.send_message(embed=embed,ephemeral=False)
+			if not players:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['shizotop']['messages']['empty-shizo-list'])
+				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				return
-			embed = discord.Embed(description = f'Ноль игроков нахуй. Крев сдох блять',colour = discord.Colour.red())
-			await interaction.response.send_message(embed=embed,ephemeral=True)
+			l = []
+			for nick,discordid,time_played in players:
+				user = interaction.guild.get_member(discordid)
+				nick = nick.replace('_','\\_')
+				if user:
+					user = Template(self.bot.language.commands['shizotop']['messages']['user-format']).safe_substitute(user=user.mention)
+					player = Template(self.bot.language.commands['shizotop']['messages']['player-format']).safe_substitute(user=user,time=relativeTimeParser(time_played),nick=nick)
+				else:
+					player = Template(self.bot.language.commands['shizotop']['messages']['player-format']).safe_substitute(user='',time=relativeTimeParser(time_played),nick=nick)
+			l = '\n'.join(l)
+			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['shizotop']['messages']['shizo-list']).safe_substitute(players=l))
+			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
+			
 
 		self.exception_group = app_commands.Group(name="exception", description="Управление исключениями с сервера")
 		
@@ -831,32 +840,6 @@ class DiscordMinecraft:
 					cursor.execute(f'UPDATE mc_accounts SET mc_accounts.inactive=TRUE WHERE discordid={member.id}')
 			self.member_remove = member_remove
 
-
-	async def add_exception(self, member: discord.Member, reason: str = None, seconds: int = 0, minutes: int = 0, hours: int = 0, days: int = 0, years: int = 0):
-		time = seconds+(minutes*60)+(hours*3600)+(days*86400)+(years*31536000)
-		with self.bot.cursor() as cursor:
-			if reason:
-				cursor.execute(f'INSERT INTO mc_exceptions (id,end,reason) VALUES ((SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\'),UNIX_TIMESTAMP()+{time},?,TRUE) ON DUPLICATE KEY UPDATE end=end+{time}, reason=?',(reason,reason,))
-			else:
-				cursor.execute(f'INSERT INTO mc_exceptions (id,end) VALUES ((SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\'),UNIX_TIMESTAMP()+{time},TRUE) ON DUPLICATE KEY UPDATE isolated=TRUE, end=end+{time})')
-		# запрос на сервер
-		try:
-			await member.add_roles(self.bot.guild().get_role(self.exception_role))
-		except:
-			pass	
-	async def remove_exception(self, member: discord.Member):
-		try:
-			await member.remove_roles(self.bot.guild().get_role(self.exception_role))
-		except:
-			pass
-		with self.bot.cursor() as cursor:
-			cursor.execute(f'SELECT id FROM mc_exceptions WHERE id=(SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\')')
-			if cursor.fetchone():
-				cursor.execute(f'DELETE FROM mc_exceptions WHERE id=(SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\')')
-				return True
-				# запрос на сервер
-		return False
-
 	def fetchDiscordByNick(self,nick: str):
 		cursor = self.bot.cursor()
 		cursor.execute(f'SELECT discordid FROM mc_accounts WHERE LOWER(nick) LIKE LOWER(?)',(nick,))
@@ -989,38 +972,7 @@ class DiscordMinecraft:
 			else:
 				final.append([stage['title'],stage['choose'][question]['title']])
 		return final
-
-	async def on_account_not_found(self,interaction: discord.Interaction): #Пользователь не имеет игрового аккаунта
-		embed = discord.Embed(
-			description = f'У вас нет привязанного игрового аккаунта',
-			colour = discord.Colour.red()
-			)
-		await interaction.response.send_message(embed=embed,ephemeral=True)
-
-	async def on_incorrect_nick(self,interaction: discord.Interaction):
-		embed = discord.Embed(description = f'Неверно указан игровой ник',colour = discord.Colour.red())
-		await interaction.response.send_message(embed=embed,ephemeral=True)
-	async def on_incorrect_referal(self,interaction: discord.Interaction):
-		embed = discord.Embed(description = f'Пригласивший вас пользователь не найден, перепроверьте введенный никнейм',colour = discord.Colour.red())
-		await interaction.response.send_message(embed=embed,ephemeral=True)
-	async def on_already_registered(self, interaction: discord.Interaction):
-		embed = discord.Embed(description = f'Вы уже зарегистрированны',colour = discord.Colour.red())
-		await interaction.response.send_message(embed=embed,ephemeral=True)
-	async def on_nick_already_registered(self, interaction: discord.Interaction):
-		embed = discord.Embed(description = f'Указанный вами никнейм уже занят. Выберите другой',colour = discord.Colour.red())
-		await interaction.response.send_message(embed=embed,ephemeral=True)
-	async def on_registration_start(self, interaction: discord.Interaction,channel):
-		embed = discord.Embed(
-			description = f'Регистрация начата, перейдите в канал [{channel.name}](https://discord.com/channels/{self.bot.guild_id}/{channel.id})',
-			colour = discord.Colour.green()
-			)
-		await interaction.response.send_message(embed=embed,ephemeral=True)
-	async def on_registration_cooldown(self, interaction: discord.Interaction, time: int):
-		embed = discord.Embed(description = f'Вы сможете повторить заявку <t:{time}:R>',colour = discord.Colour.red())
-		await interaction.response.send_message(embed=embed,ephemeral=True)
-	async def on_registration_exists(self,interaction: discord.Interaction):
-		embed = discord.Embed(description = f'У вас уже есть активная заявка на регистрацию',colour = discord.Colour.red())
-		await interaction.response.send_message(embed=embed,ephemeral=True)
+	
 	async def on_registration_next_stage(self,interaction: discord.Interaction,next_stage: str): # пользователь перешел на следующую стадию
 		if self.isFormStage(next_stage):
 			content,embeds,component = self.registrationButton(next_stage)
@@ -1194,3 +1146,28 @@ class DiscordMinecraft:
 		for question in self.recovery_questions():
 			modal.add_item(discord.ui.TextInput(min_length=question['min'],max_length=question['max'],label=question['label'],style=discord.TextStyle.paragraph, placeholder=question['placeholder']))
 		return modal
+
+	async def add_exception(self, member: discord.Member, reason: str = None, seconds: int = 0, minutes: int = 0, hours: int = 0, days: int = 0, years: int = 0):
+		time = seconds+(minutes*60)+(hours*3600)+(days*86400)+(years*31536000)
+		with self.bot.cursor() as cursor:
+			if reason:
+				cursor.execute(f'INSERT INTO mc_exceptions (id,end,reason) VALUES ((SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\'),UNIX_TIMESTAMP()+{time},?,TRUE) ON DUPLICATE KEY UPDATE end=end+{time}, reason=?',(reason,reason,))
+			else:
+				cursor.execute(f'INSERT INTO mc_exceptions (id,end) VALUES ((SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\'),UNIX_TIMESTAMP()+{time},TRUE) ON DUPLICATE KEY UPDATE isolated=TRUE, end=end+{time})')
+		# запрос на сервер
+		try:
+			await member.add_roles(self.bot.guild().get_role(self.exception_role))
+		except:
+			pass	
+	async def remove_exception(self, member: discord.Member):
+		try:
+			await member.remove_roles(self.bot.guild().get_role(self.exception_role))
+		except:
+			pass
+		with self.bot.cursor() as cursor:
+			cursor.execute(f'SELECT id FROM mc_exceptions WHERE id=(SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\')')
+			if cursor.fetchone():
+				cursor.execute(f'DELETE FROM mc_exceptions WHERE id=(SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\')')
+				return True
+				# запрос на сервер
+		return False

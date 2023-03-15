@@ -123,7 +123,6 @@ commands:
     arguments:
       page:
         rename: 'страница'
-        describe: 'по указанному значению будет выведена информация'
     messages:
 
       # ${reason} - причина указанная при выполнении команды
@@ -572,7 +571,18 @@ commands:
         rename: 'ник_пригласившего'
         describe: 'укажите тут Discord ник или игровой ник'
     messages:
-
+      nick-already-registered: '{"embeds": [{"description": "Данный аккаунт уже зарегистрирован на игровом сервере","color": 16711680}]}'
+      active-registration-exists: '{"embeds": [{"description": "У вас уже есть активная заявка на верификацию","color": 16711680}]}'
+      referal-not-found: '{"embeds": [{"description": "Аккаунт, связанный с ником, который вы указали как пригласившего не найден","color": 16711680}]}'
+      incorrect-bedrock-nick: '{"embeds": [{"description": "Недопустимый или несуществующий ник для создания Bedrock аккаунта","color": 16711680}]}'
+      incorrect-java-nick: '{"embeds": [{"description": "Недопустимый ник для создания Java аккаунта","color": 16711680}]}'
+      already-registered: '{"embeds": [{"description": "Вы уже зарегистрированны","color": 16711680}]}'
+      registration-exists: '{"embeds": [{"description": "У вас уже есть активная заявка на регистрацию","color": 16711680}]}'
+      # ${time} - время когда можно создать заявку в формате UNIX TIME
+      registration-cooldown: '{"embeds": [{"description": "Вы сможете повторить заявку <t:${time}:R>","color": 16711680}]}'
+      # ${channel_name} - название канала
+      # ${channel_link} - ссылка на канал
+      registration-started: '{"embeds": [{"description": "Регистрация начата, перейдите в канал [${channel_name}](${channel_link})","color": 65280}]}'
   link:
     name: 'link'
     description: 'привязать второй аккаунт'
@@ -607,7 +617,23 @@ commands:
       select-java-description: 'Ник: ${nick}'
       account-not-found: '{"embeds": [{"description": "У вас не найден второй аккаунт","color": 16711680}]}'
       account-unlinked: '{"embeds": [{"description": "Аккаунт успешно отвязан","color": 65280}]}'
-  #shizotop:
+  shizotop:
+    name: 'shizotop'
+    description: 'список шизов без личной жизни'
+    arguments:
+      page:
+        rename: 'страница'
+    messages:
+      # ${time} - время игры в формате 15 минут/секунд
+      # ${user} - упоминание пользователя
+      # ${nick} - ник игрока
+      user-format: ' ({user})'
+      player-format: '**{nick}**{user}: `{time}`'
+      # чем соединять player-format
+      join-by: '\n'
+      # ${players} - список игроков в формате указанном выше
+      shizo-list: '{"embeds": [{"title": "Топ шизов", "description": "Личная шизнь вышла из чата\n\n${players}","color": 65280}]}'
+      empty-shizo-list: '{"embeds": [{"description": "Ноль игроков нахуй. Крев сдох блять","color": 16711680}]}'
   #exception_nick:
   #exception_member:
   #unexception_nick:
