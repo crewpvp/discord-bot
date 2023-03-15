@@ -233,7 +233,7 @@ class DiscordTickets:
 						field_name = Template(self.bot.language.commands['ticket_create']['messages']['ticket-author-leaved-field-name']).safe_substitute(time=time,user=interaction.user.mention)
 						field_value = Template(self.bot.language.commands['ticket_create']['messages']['ticket-author-leaved-field-value']).safe_substitute(time=time,user=interaction.user.mention)
 						embed.add_field(name=field_name,value=field_value)
-						await interaction.response.edit(view=None,embed=embed)
+						await interaction.response.edit_message(view=None,embed=embed)
 					cursor.close()
 		self.interaction = interaction
 		
