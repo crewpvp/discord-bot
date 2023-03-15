@@ -229,10 +229,10 @@ class DiscordMinecraft:
 				await channel.send(content = content, embeds = embeds, view = component)
 				await self.on_registration_start(interaction, channel)
 
-		command_init = self.bot.language.commands['recovery']['init']
-		@command_init.command(**self.bot.language.commands['recovery']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['recovery']['describe'])
-		@app_commands.rename(**self.bot.language.commands['recovery']['rename'])
+		command_init = self.bot.language.commands['link']['init']
+		@command_init.command(**self.bot.language.commands['link']['initargs'])
+		@app_commands.describe(**self.bot.language.commands['link']['describe'])
+		@app_commands.rename(**self.bot.language.commands['link']['rename'])
 		async def command_link(interaction: discord.Interaction, nick: str):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={interaction.user.id}')
@@ -300,34 +300,44 @@ class DiscordMinecraft:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['account-linked'])
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		@bot.tree.command(name="unlink", description="Отвязать один из аккаунтов", guild = self.bot.guild_object())
-		@app_commands.choices(environment=[app_commands.Choice(name='java edition', value=0),app_commands.Choice(name='bedrock edition', value=1)])
-		@app_commands.describe(environment='Редакция игры с которой нужно отвязать аккаунт')
-		@app_commands.rename(environment='версия_игры')
+		command_init = self.bot.language.commands['unlink']['init']
+		@command_init.command(**self.bot.language.commands['unlink']['initargs'])
+		@app_commands.describe(**self.bot.language.commands['unlink']['describe'])
+		@app_commands.rename(**self.bot.language.commands['unlink']['rename'])
 		async def command_unlink(interaction: discord.Interaction, environment: app_commands.Choice[int] = None):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT bedrockId,javaUniqueId,javaUsername,bedrockUsername FROM LinkedPlayers WHERE javaUniqueId = (SELECT UNHEX(REPLACE(id, \'-\', \'\')) FROM mc_accounts WHERE discordid = {interaction.user.id} LIMIT 1)')
 				data = cursor.fetchone()
 				if not data:
-					await self.on_account_not_found(interaction)
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['unlink']['messages']['account-not-found'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
 				bedrock_uuid, java_uuid, java_nick, bedrock_nick = data
 				bedrock_uuid, java_uuid = uuid.UUID(bytes=bedrock_uuid), uuid.UUID(bytes=java_uuid)
 				if not environment:
 					component = discord.ui.View(timeout=None)
 					options = []
-					options.append(discord.SelectOption(label='Java аккаунт',value=0,description=f'Ник: {java_nick}'))
-					options.append(discord.SelectOption(label='Bedrock аккаунт',value=1,description=f'Ник: {bedrock_nick}'))
-					component.add_item(discord.ui.Select(custom_id='unlink_account',disabled=False, min_values=1, max_values=1, placeholder='Выберите редакцию игры', options=options))
-					await interaction.response.send_message(view = component, ephemeral=True)
+					label = Template(self.bot.language.commands['unlink']['messages']['select-java-label']).safe_substitute(nick=java_nick)
+					description = Template(self.bot.language.commands['unlink']['messages']['select-java-description']).safe_substitute(nick=java_nick)
+					options.append(discord.SelectOption(label=label,value=0,description=description))
+					label = Template(self.bot.language.commands['unlink']['messages']['select-bedrock-label']).safe_substitute(nick=bedrock_nick)
+					description = Template(self.bot.language.commands['unlink']['messages']['select-bedrock-description']).safe_substitute(nick=bedrock_nick)
+					options.append(discord.SelectOption(label=label,value=1,description=description))
+					placeholder = self.bot.language.commands['unlink']['messages']['select-placeholder']
+					component.add_item(discord.ui.Select(custom_id='unlink_account',disabled=False, min_values=1, max_values=1, placeholder=placeholder, options=options))
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['unlink']['messages']['select-message'])
+					await interaction.response.send_message(view=component,content=content,embeds=embeds, ephemeral=True)
 				else:
 					environment = environment.value
 					cursor.execute(f'DELETE FROM LinkedPlayers WHERE javaUniqueId = UNHEX(REPLACE(\'{java_uuid}\', \'-\', \'\')) AND bedrockId = UNHEX(REPLACE(\'{bedrock_uuid}\', \'-\', \'\'))')
 					if environment == 0:
 						cursor.execute(f'UPDATE mc_accounts SET id=\'{bedrock_uuid}\', nick=\'{bedrock_nick}\', pseudonym=\'{bedrock_nick}\' WHERE id=\'{java_uuid}\'')
 						# запрос к серверу
-					embed = discord.Embed(description = f'Аккаунт успешно отвязан',colour = discord.Colour.green())
-					await interaction.response.send_message(embed=embed)
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['unlink']['messages']['account-unlinked'])
+					if interaction.message:
+						await interaction.response.edit_message(content=content,embeds=embeds,view=None)
+					else:
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
 		@bot.tree.command(name="shizotop", description="Топ шизов без личной жизни", guild = self.bot.guild_object())
 		@app_commands.describe(page='по указанному значению будет выведена информация')
