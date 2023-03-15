@@ -7,8 +7,6 @@ from modules.MinecraftWebAPI import MinecraftWebAPI
 from string import Template
 from manager import DiscordManager
 
-
-	
 class DiscordMinecraft:
 	def __init__(self, bot, category: int, channel: int, cooldown: int, registered_role: int,approved_time:int, disapproved_time: int,request_duration: int,exception_role: int,inactive_role: int, inactive_time: int,inactive_on_leave:bool,counter_enabled: bool, counter_format:str, counter_channels:int, check_every_seconds: int, web_host: str, web_login: str, web_password: str):
 		self.bot = bot
@@ -350,7 +348,7 @@ class DiscordMinecraft:
 		@app_commands.describe(**self.bot.language.commands['shizotop']['describe'])
 		@app_commands.rename(**self.bot.language.commands['shizotop']['rename'])
 		async def command_shizotop(interaction: discord.Interaction, page: int = 1):
-			page = 1 if page < 1 else page-1
+			page = 0 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT nick,discordid,time_played FROM mc_accounts ORDER BY time_played DESC LIMIT {page*25},25')
 				players = cursor.fetchall()
@@ -371,76 +369,76 @@ class DiscordMinecraft:
 			l = (self.bot.language.commands['shizotop']['messages']['join-by']).join(l)
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['shizotop']['messages']['shizo-list']).safe_substitute(players=l))
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
-			
-		self.exception_group = app_commands.Group(name="exception", description="Управление исключениями с сервера")
 		
-		@self.exception_group.command(name="nick", description="Исключить малого по нику на промежуток времени")
-		@app_commands.describe(nick='введенному игроку будет выдано исключение на период')
-		@app_commands.rename(nick='игровой_ник')
-		@app_commands.describe(days='количество дней исключения, поддерживает дробные значения')
-		@app_commands.rename(days='дни')
-		@app_commands.describe(reason='причина по которой выдано исключение')
-		@app_commands.rename(reason='по_причине')
+		command_init = self.bot.language.commands['exception_nick']['init']
+		@command_init.command(**self.bot.language.commands['exception_nick']['initargs'])
+		@app_commands.choices(**self.bot.language.commands['exception_nick']['choices'])
+		@app_commands.describe(**self.bot.language.commands['exception_nick']['describe'])
+		@app_commands.rename(**self.bot.language.commands['exception_nick']['rename'])
 		async def command_exception_nick(interaction: discord.Interaction, nick: str, days: float = 1.0, reason: str = None):
-			with self.bot.cursor() as cursor:
-				cursor.execute('SELECT discordid FROM mc_accounts WHERE nick=? LIMIT 1',(nick,))
-				data = cursor.fetchone()
-			if data:
-				member = interaction.guild.get_member(data[0])
-				if member:
-					await command_exception_member.callback(interaction,member,days,reason)
-					return
-			embed = discord.Embed(description='Пользователь с данным ником не найден',colour = discord.Colour.red())
-			await interaction.response.send_message(embed=embed)
-		
-		@self.exception_group.command(name="member", description="Исключить малого по дискорд аккаунту на промежуток времени")
-		@app_commands.describe(member='введенному пользователю будет выдано исключение на период')
-		@app_commands.rename(member='discord_пользователь')
-		@app_commands.describe(days='количество дней исключения, поддерживает дробные значения')
-		@app_commands.rename(days='дни')
-		@app_commands.describe(reason='причина по которой выдано исключение')
-		@app_commands.rename(reason='по_причине')
+			user = await self.add_exception(nick=nick,reason=reason,days=days)
+			if not user:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['exception_nick']['messages']['account-not-found'])
+				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+				return
+			reason = Template(self.bot.language.commands['exception_nick']['messages']['reason-format']).safe_substitute(reason=reason) if reason else ''
+			user = Template(self.bot.language.commands['exception_nick']['messages']['user-format']).safe_substitute(user=user.mention) if user!=True else ''
+			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['exception_nick']['messages']['player-exceptioned']).safe_substitute(user=user,nick=nick,reason=reason,time=relativeTimeParser(days=days)))
+			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
+				
+		command_init = self.bot.language.commands['exception_member']['init']
+		@command_init.command(**self.bot.language.commands['exception_member']['initargs'])
+		@app_commands.choices(**self.bot.language.commands['exception_member']['choices'])
+		@app_commands.describe(**self.bot.language.commands['exception_member']['describe'])
+		@app_commands.rename(**self.bot.language.commands['exception_member']['rename'])
 		async def command_exception_member(interaction: discord.Interaction, member: discord.Member, days: float = 1.0, reason: str = None):
-			await self.add_exception(member,reason,days=days)
-			reason = f'\nПричина: {reason}' if reason else ''
-			embed = discord.Embed(description = f'{member.mention} исключен с игрового сервера на срок {relativeTimeParser(days=days)}{reason}',colour = discord.Colour.green())
-			await interaction.response.send_message(embed=embed)
-		
-		bot.tree.add_command(self.exception_group, guild = self.bot.guild_object())
-
-		self.unexception_group = app_commands.Group(name="unexception", description="Управление разблокировками исключений сервера")
-
-		@self.unexception_group.command(name="nick", description="Отменить исключение малого по нику")
-		async def command_unexception_nick(interaction: discord.Interaction, nick: str):
 			with self.bot.cursor() as cursor:
-				cursor.execute('SELECT discordid FROM mc_accounts WHERE nick=? LIMIT 1',(nick,))
-				data = cursor.fetchone()
-			if data:
-				member = interaction.guild.get_member(data[0])
-				if member:
-					await command_unexception_member.callback(interaction,member)
-					return
-			embed = discord.Embed(description='Пользователь с данным ником не найден',colour = discord.Colour.red())
-			await interaction.response.send_message(embed=embed)
-		@self.unexception_group.command(name="member", description="Отменить исключение малого по дискорд аккаунту")
-		async def command_unexception_member(interaction: discord.Interaction, member: discord.Member):
-			if await self.remove_exception(member):
-				embed = discord.Embed(description = f'{member.mention} отпустили все совершенные ранее грехи',colour = discord.Colour.green())
-				await interaction.response.send_message(embed=embed)
-			else:
-				embed = discord.Embed(description = f'{member.mention} не имеет ни единого греха',colour = discord.Colour.red())
-				await interaction.response.send_message(embed=embed, ephemeral=True)
+				cursor.execute(f'SELECT nick FROM mc_accounts WHERE discordid={member.id}')
+				data=cursor.fetchone()
+			if not data:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['exception_member']['messages']['account-not-found'])
+				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+				return
+			await command_exception_nick.callback(nick=data[0],days=days,reason=reason)
 		
-		bot.tree.add_command(self.unexception_group, guild = self.bot.guild_object())
+		command_init = self.bot.language.commands['unexception_nick']['init']
+		@command_init.command(**self.bot.language.commands['unexception_nick']['initargs'])
+		@app_commands.choices(**self.bot.language.commands['unexception_nick']['choices'])
+		@app_commands.describe(**self.bot.language.commands['unexception_nick']['describe'])
+		@app_commands.rename(**self.bot.language.commands['unexception_nick']['rename'])
+		async def command_unexception_nick(interaction: discord.Interaction, nick: str):
+			user = await self.remove_exception(nick=nick)
+			if not user:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['unexception_nick']['messages']['account-not-found'])
+				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+				return
+			user = Template(self.bot.language.commands['unexception_nick']['messages']['user-format']).safe_substitute(user=user.mention) if user!=True else ''
+			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['unexception_nick']['messages']['player-unexceptioned']).safe_substitute(user=user,nick=nick))
+			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
+		
+		command_init = self.bot.language.commands['unexception_member']['init']
+		@command_init.command(**self.bot.language.commands['unexception_member']['initargs'])
+		@app_commands.choices(**self.bot.language.commands['unexception_member']['choices'])
+		@app_commands.describe(**self.bot.language.commands['unexception_member']['describe'])
+		@app_commands.rename(**self.bot.language.commands['unexception_member']['rename'])
+		async def command_unexception_member(interaction: discord.Interaction, member: discord.Member):
+			with self.bot.cursor() as cursor:
+				cursor.execute(f'SELECT nick FROM mc_accounts WHERE discordid={member.id}')
+				data=cursor.fetchone()
+			if not data:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['unexception_member']['messages']['account-not-found'])
+				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+				return
+			await command_unexception_nick.callback(nick=data[0])
 
 		command_init = self.bot.language.commands['exceptions']['init']
 		@command_init.command(**self.bot.language.commands['exceptions']['initargs'])
 		@app_commands.describe(**self.bot.language.commands['exceptions']['describe'])
 		@app_commands.rename(**self.bot.language.commands['exceptions']['rename'])
-		async def command_exceptions(interaction: discord.Interaction, page: int = None):
-			page = 0 if not page or page < 1 else page-1
+		async def command_exceptions(interaction: discord.Interaction, page: int = 1):
+			page = 0 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
-				cursor.execute(f'SELECT a.nick,a.discordid,e.start,e.end,e.reason FROM mc_exceptions AS e JOIN mc_accounts AS a ON a.id=e.id ORDER BY start LIMIT {page},25 ')
+				cursor.execute(f'SELECT a.nick,a.discordid,e.start,e.end,e.reason FROM mc_exceptions AS e JOIN mc_accounts AS a ON a.id=e.id ORDER BY start LIMIT {page*25},25 ')
 				players = cursor.fetchall()
 			if not players:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['exceptions']['messages']['empty-exception-list'])
@@ -466,7 +464,7 @@ class DiscordMinecraft:
 		@app_commands.describe(**self.bot.language.commands['referals_top']['describe'])
 		@app_commands.rename(**self.bot.language.commands['referals_top']['rename'])
 		async def command_referals_top(interaction: discord.Interaction, page: int = 1):
-			page = 1 if page < 1 else page-1
+			page = 0 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT a.nick,r.user,COUNT(r.referal) as cnt FROM mc_referals AS r JOIN mc_accounts AS a ON a.discordid=r.user GROUP BY user ORDER BY cnt DESC LIMIT {page*25},25')
 				players = cursor.fetchall()
@@ -493,7 +491,7 @@ class DiscordMinecraft:
 		@app_commands.describe(**self.bot.language.commands['referals_mine']['describe'])
 		@app_commands.rename(**self.bot.language.commands['referals_mine']['rename'])
 		async def command_referals_mine(interaction: discord.Interaction, page: int = 1):
-			page = 1 if page < 1 else page-1
+			page = 0 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT nick,discordid FROM mc_referals JOIN mc_accounts ON discordid=referal WHERE user={interaction.user.id} LIMIT {page*25},25')
 				players = cursor.fetchall()
@@ -1146,27 +1144,36 @@ class DiscordMinecraft:
 			modal.add_item(discord.ui.TextInput(min_length=question['min'],max_length=question['max'],label=question['label'],style=discord.TextStyle.paragraph, placeholder=question['placeholder']))
 		return modal
 
-	async def add_exception(self, member: discord.Member, reason: str = None, seconds: int = 0, minutes: int = 0, hours: int = 0, days: int = 0, years: int = 0):
+	async def add_exception(self, nick: str, reason: str = None, seconds: int = 0, minutes: int = 0, hours: int = 0, days: int = 0, years: int = 0):
 		time = seconds+(minutes*60)+(hours*3600)+(days*86400)+(years*31536000)
+		id = self.getJavaUUID(nick) if not nick.startswith('.') else getBedrockUUID(nick)
+		if not id:
+			return False
 		with self.bot.cursor() as cursor:
+			cursor.execute(f'SELECT discordid FROM mc_exceptions WHERE id=\'{id}\'')
+			if not (data:=cursor.fetchone()):
+				return False
 			if reason:
-				cursor.execute(f'INSERT INTO mc_exceptions (id,end,reason) VALUES ((SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\'),UNIX_TIMESTAMP()+{time},?,TRUE) ON DUPLICATE KEY UPDATE end=end+{time}, reason=?',(reason,reason,))
+				cursor.execute(f'INSERT INTO mc_exceptions (id,end,reason) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time},?,TRUE) ON DUPLICATE KEY UPDATE end=end+{time}, reason=?',(reason,reason,))
 			else:
-				cursor.execute(f'INSERT INTO mc_exceptions (id,end) VALUES ((SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\'),UNIX_TIMESTAMP()+{time},TRUE) ON DUPLICATE KEY UPDATE isolated=TRUE, end=end+{time})')
+				cursor.execute(f'INSERT INTO mc_exceptions (id,end) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time},TRUE) ON DUPLICATE KEY UPDATE isolated=TRUE, end=end+{time})')
+			if(member:=self.bot.guild().get_member(data[0])):
+				await member.add_roles(self.bot.guild().get_role(self.exception_role))
+				return member
+			return True
 		# запрос на сервер
-		try:
-			await member.add_roles(self.bot.guild().get_role(self.exception_role))
-		except:
-			pass	
-	async def remove_exception(self, member: discord.Member):
-		try:
-			await member.remove_roles(self.bot.guild().get_role(self.exception_role))
-		except:
-			pass
+			
+	async def remove_exception(self, nick: str):
+		id = self.getJavaUUID(nick) if not nick.startswith('.') else getBedrockUUID(nick)
+		if not id:
+			return False
 		with self.bot.cursor() as cursor:
-			cursor.execute(f'SELECT id FROM mc_exceptions WHERE id=(SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\')')
-			if cursor.fetchone():
-				cursor.execute(f'DELETE FROM mc_exceptions WHERE id=(SELECT id FROM mc_accounts WHERE discordid = \'{member.id}\')')
+			cursor.execute(f'SELECT discordid FROM mc_exceptions WHERE id=\'{id}\'')
+			if (data:=cursor.fetchone()):
+				cursor.execute(f'DELETE FROM mc_exceptions WHERE id=\'{id}\'')
+				if(member:=self.bot.guild().get_member(data[0])):
+					await member.remove_roles(self.bot.guild().get_role(self.exception_role))
+					return member
 				return True
 				# запрос на сервер
 		return False

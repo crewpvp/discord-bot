@@ -5,8 +5,8 @@ command_groups:
   profile: 'управление профилем'
   tickets: 'управление тикетами'
   registration: 'управление регистрацией'
-  #exception: 'управление исключениями с игрового сервера'
-  #unexception: 'управление исключениями с игрового сервера'
+  exception: 'управление исключениями с игрового сервера'
+  unexception: 'управление исключениями с игрового сервера'
   referals: 'управление приглашенными участниками'
 commands:
   nickcolor:
@@ -634,10 +634,64 @@ commands:
       # ${players} - список игроков в формате указанном выше
       shizo-list: '{"embeds": [{"title": "Топ шизов", "description": "Личная шизнь вышла из чата\n\n${players}","color": 65280}]}'
       empty-shizo-list: '{"embeds": [{"description": "Ноль игроков нахуй. Крев сдох блять","color": 16711680}]}'
-  #exception_nick:
-  #exception_member:
-  #unexception_nick:
-  #unexception_member:
+  exception_nick:
+    name: 'nick'
+    description: 'исключить малого на срок по нику'
+    group: 'exception'
+    arguments:
+      nick:
+        rename: 'игровой_ник'
+      reason:
+        rename: 'причина'
+      days:
+        rename: 'длительность'
+        describe: 'количество дней исключения, поддерживает дробные значения'
+    messages:
+      account-not-found: '{"embeds": [{"description": "Пользователь с указанным ником не зарегистрирован на сервере","color": 16711680}]}'
+      reason-format: '\nПо причине ${reason}'
+      # ${user} - упоминание пользователя
+      user-format: '(${user})'
+      # ${nick} - игровой ник
+      # ${user} - упоминание пользователя, если найден аккаунт
+      # ${time} - длительность исключения в формате 15 секунд/минут..
+      # ${reason} - причина, если указана
+      player-exceptioned: '{"embeds": [{"description": "**${nick}**${user} исключен с игрового сервера на срок ${time}${reason}","color": 65280}]}'
+  exception_member:
+    name: 'member'
+    description: 'исключить малого на срок по discord аккаунту'
+    group: 'exception'
+    arguments:
+      member:
+        rename: 'пользователь_discord'
+      reason:
+        rename: 'причина'
+      days:
+        rename: 'длительность'
+        describe: 'количество дней исключения, поддерживает дробные значения'
+    messages:
+      account-not-found: '{"embeds": [{"description": "Указанный участник не зарегистрирован на игровом сервере","color": 16711680}]}'
+  unexception_nick:
+    name: 'nick'
+    description: 'снять все грехи с малого по нику'
+    group: 'unexception'
+    arguments:
+      nick:
+        rename: 'игровой_ник'
+    messages:
+      account-not-found: '{"embeds": [{"description": "Пользователь с указанным ником не найден в списке исключенных","color": 16711680}]}'
+      user-format: '(${user})'
+      # ${nick} - игровой ник
+      # ${user} - упоминание пользователя, если найден аккаунт
+      player-unexceptioned: '{"embeds": [{"description": "**${nick}**${user} отпустили все грехи","color": 65280}]}'
+  unexception_member:
+    name: 'member'
+    description: 'снять все грехи с малого по discord аккаунту'
+    group: 'unexception'
+    arguments:
+      member:
+        rename: 'пользователь_discord'
+    messages:
+      account-not-found: '{"embeds": [{"description": "Указанный участник не зарегистрирован на игровом сервере","color": 16711680}]}'
   exceptions:
     name: 'exceptions'
     description: 'список исключенных, время исключения и причины'
