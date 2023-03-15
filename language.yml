@@ -339,7 +339,7 @@ commands:
           'синяя': 1
           'серая': 2
           'зеленая': 3
-          'красня': 4
+          'красная': 4
       label:
         rename: 'название'
         description: 'максимальная длина 80 символов'
@@ -440,14 +440,14 @@ commands:
           'синяя': 1
           'серая': 2
           'зеленая': 3
-          'красня': 4
+          'красная': 4
       java_color:
         rename: 'цвет_java'
         choices:
           'синяя': 1
           'серая': 2
           'зеленая': 3
-          'красня': 4
+          'красная': 4
     messages:
       default-bedrock-text: 'Bedrock Edition'
       default-java-text: 'Java Edition'
@@ -463,7 +463,7 @@ commands:
           'синяя': 1
           'серая': 2
           'зеленая': 3
-          'красня': 4
+          'красная': 4
       label:
         rename: 'название'
         description: 'максимальная длина 80 символов'
@@ -511,13 +511,17 @@ commands:
       response-create-message: '{"embeds": [{"description": "Заявка на восстановление создана.\nОжидайте решение модерации${time}","color": 65280}]}'
 
       # ${time} - время в формате UNIX TIME
-      # ${user} - упоминание пользователя, который ответил на тикет
+      # ${user} - упоминание пользователя, который ответил на заявку
+      # ${reason} - причина отказа заявки
       declined-field-name: 'Отклонено <t:${time}:R>'
-      declined-field-value: '${user}'
+      declined-reason-format: ' по причине ${reason}'
+      declined-field-value: '${user}${reason}'
 
       accepted-field-name: 'Одобрено <t:${time}:R>'
-      declined-reason-format: ' по причине ${reason}'
-      recovery-accepted-field-value: '${user}${reason}'
+      accepted-field-value: '${user}'
+
+      author-leaved-field-name: 'Отклонено <t:${time}:R>'
+      author-leaved-field-value: 'Автор заявки покинул Discord сервер'
 
       dm-accepted-message: '{"embeds": [{"title":"Восстановление crewpvp.xyz","description": "Ваша заявка была одобрена! Приятной игры!","color": 65280}]}'
       # ${reason} - причина указанная в отклонении
@@ -528,8 +532,6 @@ commands:
       decline-modal-label: 'Опишите причину отказа'
       decline-modal-placeholder: 'Шизик не сможет вернуться? Грустно (х2).'
 
-      author-leaved-field-name: 'Отклонено <t:${time}:R>'
-      author-leaved-field-value: 'Автор заявки покинул Discord сервер'
   authorize:
     name: 'authorize'
     description: 'авторизовать игровой аккаунт'
@@ -595,6 +597,7 @@ commands:
       registration-decline-modal-label: 'Опишите причину отказа'
       registration-decline-modal-placeholder: 'Шизик не сможет играть? Грустно.'
 
+      invalid-registration-user: '{"embeds": [{"description": "Вы не являетесь участником данной регистрации","color": 16711680}]}'
   link:
     name: 'link'
     description: 'привязать второй аккаунт'

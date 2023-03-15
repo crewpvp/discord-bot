@@ -50,8 +50,8 @@ class DiscordMinecraft:
 		@app_commands.describe(**self.bot.language.commands['registration_startbuttons']['describe'])
 		@app_commands.rename(**self.bot.language.commands['registration_startbuttons']['rename'])
 		async def command_registration_startbuttons(interaction: discord.Interaction, java_label: str = None, java_color: app_commands.Choice[int] = None,bedrock_label: str = None, bedrock_color: app_commands.Choice[int] = None):
-			java_label = label[:80] if java_label else self.bot.language.commands['registration_startbuttons']['messages']['default-java-text']
-			bedrock_label = label[:80] if bedrock_label else self.bot.language.commands['registration_startbuttons']['messages']['default-bedrock-text']
+			java_label = java_label[:80] if java_label else self.bot.language.commands['registration_startbuttons']['messages']['default-java-text']
+			bedrock_label = bedrock_label[:80] if bedrock_label else self.bot.language.commands['registration_startbuttons']['messages']['default-bedrock-text']
 			java_color = discord.ButtonStyle(java_color.value) if java_color else discord.ButtonStyle(2)
 			bedrock_color = discord.ButtonStyle(bedrock_color.value) if bedrock_color else discord.ButtonStyle(2)
 			view = discord.ui.View(timeout=None)
@@ -564,9 +564,15 @@ class DiscordMinecraft:
 						cursor.execute(f'SELECT stage FROM mc_registrations WHERE discordid={interaction.user.id} AND channelid={interaction.channel_id}')
 						stage = cursor.fetchone()
 						if stage:
-							await self.on_registration_stage_open(interaction,stage[0])
+							сurrent_stage = stage[0]
+							content,embeds,component = self.parseQuestions(current_stage)
+							if self.isFormStage(current_stage):
+								await interaction.response.send_modal(component)
+							else:
+								await interaction.response.edit_message(embeds=embeds,content=content,view=component)
 						else:
-							await self.on_registration_invalid_user(interaction)
+							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['invalid-registration-user'])
+							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				elif customid == "registration_skip_stage":
 					with self.bot.cursor() as cursor:
 						cursor.execute(f'SELECT id,stage,nick,referal FROM mc_registrations WHERE discordid={interaction.user.id} AND channelid={interaction.channel.id}')
@@ -575,7 +581,12 @@ class DiscordMinecraft:
 							id,stage,nick,referal = values
 							if (next_stage:= self.getNextStage(stage)) != None:
 								cursor.execute(f'UPDATE mc_registrations SET stage=\'{next_stage}\' WHERE id={id}')
-								await self.on_registration_next_stage(interaction,next_stage)
+								if self.isFormStage(next_stage):
+									content,embeds,component = self.registrationButton(next_stage)
+									await interaction.response.edit_message(embeds=embeds,content=content,view=component)
+								else:
+									content,embeds,component = self.parseQuestions(next_stage)
+									await interaction.response.edit_message(embeds=embeds,content=content,view=component)
 							else:
 								if referal:
 									referal = interaction.guild.get_member(referal)
@@ -583,7 +594,8 @@ class DiscordMinecraft:
 								cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
 								await self.on_registration_send(interaction,id,nick,message, referal)
 						else:
-							await self.on_registration_invalid_user(interaction)
+							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['invalid-registration-user'])
+							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				elif customid == "registration_stage":
 					question = interaction.data['values'][0]
 					with self.bot.cursor() as cursor:
@@ -594,7 +606,12 @@ class DiscordMinecraft:
 							cursor.execute(f'INSERT INTO mc_registrations_answers (id,stage,question) VALUES({id},\'{stage}\',\'{question}\')')
 							if (next_stage:= self.getNextStage(stage,question)) != None:
 								cursor.execute(f'UPDATE mc_registrations SET stage=\'{next_stage}\' WHERE id={id}')
-								await self.on_registration_next_stage(interaction,next_stage)
+								if self.isFormStage(next_stage):
+									content,embeds,component = self.registrationButton(next_stage)
+									await interaction.response.edit_message(embeds=embeds,content=content,view=component)
+								else:
+									content,embeds,component = self.parseQuestions(next_stage)
+									await interaction.response.edit_message(embeds=embeds,content=content,view=component)
 							else:
 								if referal:
 									referal = interaction.guild.get_member(referal)
@@ -602,7 +619,8 @@ class DiscordMinecraft:
 								cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
 								await self.on_registration_send(interaction,id,nick,message, referal)
 						else:
-							await self.on_registration_invalid_user(interaction)
+							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['invalid-registration-user'])
+							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				elif customid == 'registration_disapprove':
 					await interaction.response.send_modal(self.registration_decline_modal())
 				elif customid == 'registration_approve':
@@ -716,7 +734,12 @@ class DiscordMinecraft:
 							
 							if (next_stage:= self.getNextStage(stage)) != None:
 								cursor.execute(f'UPDATE mc_registrations SET stage=\'{next_stage}\' WHERE id={id}')
-								await self.on_registration_next_stage(interaction,next_stage)
+								if self.isFormStage(next_stage):
+									content,embeds,component = self.registrationButton(next_stage)
+									await interaction.response.edit_message(embeds=embeds,content=content,view=component)
+								else:
+									content,embeds,component = self.parseQuestions(next_stage)
+									await interaction.response.edit_message(embeds=embeds,content=content,view=component)
 							else:
 								if referal:
 									referal = interaction.guild.get_member(referal)
@@ -724,7 +747,8 @@ class DiscordMinecraft:
 								cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
 								await self.on_registration_send(interaction,id,nick,message,referal)	
 						else:
-							await self.on_registration_invalid_user(interaction)
+							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['invalid-registration-user'])
+							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				elif customid == "registration_disapprove":
 					reason = interaction.data['components'][0]['components'][0]['value']
 					with self.bot.cursor() as cursor:
@@ -957,22 +981,7 @@ class DiscordMinecraft:
 				final.append([stage['title'],stage['choose'][question]['title']])
 		return final
 	
-	async def on_registration_next_stage(self,interaction: discord.Interaction,next_stage: str): # пользователь перешел на следующую стадию
-		if self.isFormStage(next_stage):
-			content,embeds,component = self.registrationButton(next_stage)
-			await interaction.response.edit_message(embeds=embeds,content=content,view=component)
-		else:
-			content,embeds,component = self.parseQuestions(next_stage)
-			await interaction.response.edit_message(embeds=embeds,content=content,view=component)
-	async def on_registration_stage_open(self,interaction: discord.Interaction, current_stage: str): #открытие формы регистрации, то есть нажатие на кнопку
-		content,embeds,component = self.parseQuestions(current_stage)
-		if self.isFormStage(current_stage):
-			await interaction.response.send_modal(component)
-		else:
-			await interaction.response.edit_message(embeds=embeds,content=content,view=component)
-	async def on_registration_invalid_user(self,interaction:discord.Interaction): #Каким-то образом пользователь попал в чужой канал регистрации
-		embed = discord.Embed(description = f'Вы не являетесь участником данной регистрации',colour = discord.Colour.red())
-		await interaction.response.send_message(embed=embed,ephemeral=True)
+
 	async def on_registration_user_leave(self,interaction: discord.Interaction, channel): #произошло взаимодействие с заявкой от ливнувшего пользователя
 		embed = interaction.message.embeds[0]
 		time = int(datetime.now().timestamp())
@@ -1146,6 +1155,7 @@ class DiscordMinecraft:
 		placeholder = self.bot.language.commands['recovery']['messages']['registration-decline-modal-placeholder']
 		modal.add_item(discord.ui.TextInput(max_length=512,label=label,style=discord.TextStyle.paragraph, placeholder=placeholder))
 		return modal
+	
 	def recovery_questions(self):
 		recovery = self.stages['recovery']
 		size = len(recovery)

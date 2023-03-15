@@ -252,8 +252,8 @@ class DiscordTickets:
 				try:
 					roles = [permission.id for permission in (await appcmd.fetch_permissions(guild)).permissions if permission.permission]
 				except:
-					return False
+					return True
 				break
-		if roles and not bool(set(role.id for role in member.roles) & set(roles)):
+		if not bool(set(role.id for role in member.roles) & set(roles)):
 			return False
 		return True
