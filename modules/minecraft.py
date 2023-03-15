@@ -7,6 +7,8 @@ from modules.MinecraftWebAPI import MinecraftWebAPI
 from string import Template
 from manager import DiscordManager
 
+
+	
 class DiscordMinecraft:
 	def __init__(self, bot, category: int, channel: int, cooldown: int, registered_role: int,approved_time:int, disapproved_time: int,request_duration: int,exception_role: int,inactive_role: int, inactive_time: int,inactive_on_leave:bool,counter_enabled: bool, counter_format:str, counter_channels:int, check_every_seconds: int, web_host: str, web_login: str, web_password: str):
 		self.bot = bot
@@ -37,8 +39,7 @@ class DiscordMinecraft:
 
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_registrations (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL,uuid UUID NOT NULL, nick CHAR(32) NOT NULL, referal BIGINT, channelid BIGINT UNIQUE, channel_deleted BOOL NOT NULL DEFAULT FALSE, messageid BIGINT UNIQUE, time INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), stage TEXT NOT NULL,sended INT(11), approved BOOL NOT NULL DEFAULT FALSE, closed INT(11), close_reason TEXT, PRIMARY KEY (id))")
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_registrations_answers (id INT NOT NULL, stage TEXT NOT NULL, question TEXT NOT NULL, answer TEXT, FOREIGN KEY(id) REFERENCES mc_registrations(id) ON DELETE CASCADE)")
-			
-			cursor.execute("CREATE TABLE IF NOT EXISTS mc_inactive_recovery (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL, messageid BIGINT UNIQUE, sended INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), approved BOOL NOT NULL DEFAULT FALSE, closed INT(11), close_reason TEXT, PRIMARY KEY (id))")
+		
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_change_nickname (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL, nick CHAR(32), PRIMARY KEY (id))")
 			
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_referals (user BIGINT NOT NULL,referal BIGINT NOT NULL UNIQUE)")
@@ -228,15 +229,17 @@ class DiscordMinecraft:
 				await channel.send(content = content, embeds = embeds, view = component)
 				await self.on_registration_start(interaction, channel)
 
-		@bot.tree.command(name="link", description="Привязать второй аккаунт", guild = self.bot.guild_object())
-		@app_commands.describe(nick='Ник для привязки')
-		@app_commands.rename(nick='никнейм')
+		command_init = self.bot.language.commands['recovery']['init']
+		@command_init.command(**self.bot.language.commands['recovery']['initargs'])
+		@app_commands.describe(**self.bot.language.commands['recovery']['describe'])
+		@app_commands.rename(**self.bot.language.commands['recovery']['rename'])
 		async def command_link(interaction: discord.Interaction, nick: str):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={interaction.user.id}')
 				data = cursor.fetchone()
 				if not data:
-					await self.on_account_not_found(interaction)
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['account-not-found'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
 				id, nickname = data
 				if nickname.startswith('.'):
@@ -245,48 +248,57 @@ class DiscordMinecraft:
 
 					cursor.execute(f'SELECT id FROM mc_registrations WHERE uuid=\'{java_uuid}\' AND closed IS NULL')
 					if cursor.fetchone():
-						await self.on_nick_already_registered(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['nick-already-registered'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 
 					if not re.match("[A-Za-z_0-9]{3,16}", nick) is not None:
-						await self.on_incorrect_nick(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['incorrect-java-nick'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					cursor.execute(f'SELECT id FROM mc_accounts WHERE id=\'{java_uuid}\'')
 					if cursor.fetchone():
-						await self.on_nick_already_registered(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['nick-already-registered'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					cursor.execute(f'SELECT bedrockId FROM LinkedPlayers WHERE bedrockId=UNHEX(REPLACE(\'{bedrock_uuid}\', \'-\', \'\'))')
 					if cursor.fetchone():
-						await self.on_nick_already_registered(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['nick-already-registered'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					cursor.execute(f'UPDATE mc_accounts SET id = \'{java_uuid}\', nick = \'{java_nick}\', pseudonym=\'{java_nick}\' WHERE discordid={interaction.user.id}')
 					# запрос к серверу
 				else:
 					java_uuid, java_nick = id, nickname
 					if not re.match("^\.?[A-Za-z][A-Za-z0-9]{0,11}[0-9]{0,4}",nick) is not None:
-						await self.on_incorrect_nick(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['incorrect-bedrock-nick'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					if not (bedrock_uuid:=self.getBedrockUUID(nick[1:] if nick.startswith('.') else nick)):
-						await self.on_incorrect_nick(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['incorrect-bedrock-nick'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					cursor.execute(f'SELECT id FROM mc_registrations WHERE uuid=\'{bedrock_uuid}\' AND closed IS NULL')
 					if cursor.fetchone():
-						await self.on_nick_already_registered(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['nick-already-registered'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					cursor.execute(f'SELECT bedrockId FROM LinkedPlayers WHERE bedrockId=UNHEX(REPLACE(\'{bedrock_uuid}\', \'-\', \'\'))')
 					if cursor.fetchone():
-						await self.on_nick_already_registered(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['nick-already-registered'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					cursor.execute(f'SELECT id FROM mc_accounts WHERE id=\'{bedrock_uuid}\'')
 					if cursor.fetchone():
-						await self.on_nick_already_registered(interaction)
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['nick-already-registered'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					if not nick.startswith("."):
 						nick = '.'+nick
 					bedrock_nick = nick
 				cursor.execute(f'INSERT INTO LinkedPlayers VALUES(UNHEX(REPLACE(\'{bedrock_uuid}\', \'-\', \'\')),UNHEX(REPLACE(\'{java_uuid}\', \'-\', \'\')),\'{java_nick}\',\'{bedrock_nick}\')')
-				embed = discord.Embed(description = f'Аккаунт успешно привязан',colour = discord.Colour.green())
-				await interaction.response.send_message(embed=embed)
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['account-linked'])
+				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
 		@bot.tree.command(name="unlink", description="Отвязать один из аккаунтов", guild = self.bot.guild_object())
 		@app_commands.choices(environment=[app_commands.Choice(name='java edition', value=0),app_commands.Choice(name='bedrock edition', value=1)])
