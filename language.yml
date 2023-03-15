@@ -525,6 +525,12 @@ commands:
       dm-declined-reason-format: '\n По причине ${reason}'
       dm-declined-message: '{"embeds": [{"title":"Восстановление crewpvp.xyz","description": "Ваша заявка была отклонена!${reason}","color": 65280}]}'
 
+      decline-modal-title: 'Отказ заявки'
+      decline-modal-label: 'Опишите причину отказа'
+      decline-modal-placeholder: 'Шизик не сможет вернуться? Грустно (х2).'
+
+      author-leaved-field-name: 'Отклонено <t:${time}:R>'
+      author-leaved-field-value: 'Автор заявки покинул Discord сервер'
   authorize:
     name: 'authorize'
     description: 'авторизовать игровой аккаунт'

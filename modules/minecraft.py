@@ -519,10 +519,18 @@ class DiscordMinecraft:
 								pass
 						else:
 							cursor.execute(f'UPDATE mc_inactive_recovery SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE messageid={interaction.message.id}')
-							await self.on_inactive_recovery_user_leave(interaction)
+							embed = interaction.message.embeds[0]
+							time = int(datetime.now().timestamp())
+							field_name = Template(self.bot.language.commands['ticket_create']['messages']['author-leaved-field-name']).safe_substitute(time=time,user=interaction.user.mention)
+							field_value = Template(self.bot.language.commands['ticket_create']['messages']['author-leaved-field-value']).safe_substitute(time=time,user=interaction.user.mention)
+							embed.add_field(name=field_name,value=field_value)
+							await interaction.response.edit_message(view=None,embed=embed)
 				elif customid == "inactive_recovery_disapprove":
-					modal = discord.ui.Modal(title='Отказ заявки', custom_id = "inactive_recovery_disapprove")
-					modal.add_item(discord.ui.TextInput(max_length=256,label="Опишите причину отказа",style=discord.TextStyle.paragraph, placeholder=f'Шизик не сможет вернуться? Грустно (х2).'))
+					modal_title = self.bot.language.commands['recovery']['messages']['decline-modal-title']
+					modal = discord.ui.Modal(title=modal_title, custom_id = "inactive_recovery_disapprove")
+					label = self.bot.language.commands['recovery']['messages']['decline-modal-label']
+					placeholder = self.bot.language.commands['recovery']['messages']['decline-modal-placeholder']
+					modal.add_item(discord.ui.TextInput(max_length=512,label=label,style=discord.TextStyle.paragraph, placeholder=placeholder))
 					await interaction.response.send_modal(modal)
 				elif customid == "registration_start_bedrock":
 					modal = discord.ui.Modal(title='Регистрация Bedrock Edition', custom_id = "registration_start_bedrock")
@@ -656,7 +664,12 @@ class DiscordMinecraft:
 								pass
 						else:
 							cursor.execute(f'UPDATE mc_inactive_recovery SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE messageid={interaction.message.id}')
-							await self.on_inactive_recovery_user_leave(interaction)
+							embed = interaction.message.embeds[0]
+							time = int(datetime.now().timestamp())
+							field_name = Template(self.bot.language.commands['ticket_create']['messages']['author-leaved-field-name']).safe_substitute(time=time,user=interaction.user.mention)
+							field_value = Template(self.bot.language.commands['ticket_create']['messages']['author-leaved-field-value']).safe_substitute(time=time,user=interaction.user.mention)
+							embed.add_field(name=field_name,value=field_value)
+							await interaction.response.edit_message(view=None,embed=embed)
 				elif customid == "registration_start_bedrock":
 					nick = interaction.data['components'][0]['components'][0]['value']
 					referal = interaction.data['components'][1]['components'][0]['value']
@@ -961,12 +974,6 @@ class DiscordMinecraft:
 			colour = discord.Colour.red()
 			)
 		await interaction.response.send_message(embed=embed,ephemeral=True)
-		
-	async def on_inactive_user_leave(self,interaction: discord.Member): #произошло взаимодействие с восстановлением от ливнувшего пользователя
-		embed = interaction.message.embeds[0]
-		time = int(datetime.now().timestamp())
-		embed.add_field(name=f'Отклонена <t:{time}:R>',value=f'{interaction.user.mention}\nПричина: покинул Discord сервер')
-		await interaction.response.edit_message(view=None,embed=embed)
 
 	async def on_incorrect_nick(self,interaction: discord.Interaction):
 		embed = discord.Embed(description = f'Неверно указан игровой ник',colour = discord.Colour.red())
