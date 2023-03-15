@@ -638,7 +638,26 @@ commands:
   #exception_member:
   #unexception_nick:
   #unexception_member:
-  #exceptions:
+  exceptions:
+    name: 'exceptions'
+    description: 'список исключенных, время исключения и причины'
+    arguments:
+      page:
+        rename: 'страница'
+    messages:
+      # ${start_time} - когда был исключен в формате UNIX TIME
+      # ${end_time} - когда исключение заканчивается в формате UNIX TIME
+      # ${user} - упоминание пользователя
+      # ${nick} - ник игрока
+      # ${reason} - причина исключения
+      reason-format: '\n**Причина:** ${reason}'
+      user-format: ' (${user})'
+      player-format: '**${nick}**${user}\n**Получено:** <t:${start_time}:R>\n**Истекает:** <t:${end_time}:R>${reason}'
+      # чем соединять player-format
+      join-by: '\n'
+      # ${players} - список игроков в формате указанном выше
+      exception-list: '{"embeds": [{"title": "Список исключенных", "description": "Вот они, игровые импотенты.\n\n${players}","color": 65280}]}'
+      empty-exception-list: '{"embeds": [{"description": "Исключенные не найдены.","color": 16711680}]}'
   referals_top:
     name: 'top'
     group: 'referals'

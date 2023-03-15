@@ -433,35 +433,33 @@ class DiscordMinecraft:
 		
 		bot.tree.add_command(self.unexception_group, guild = self.bot.guild_object())
 
-		@bot.tree.command(name="exceptions", description="Список исключенных, время исключения и причины", guild = self.bot.guild_object())
-		@app_commands.describe(page='по указанному значению будет выведена информация')
-		@app_commands.rename(page='страница')
+		command_init = self.bot.language.commands['exceptions']['init']
+		@command_init.command(**self.bot.language.commands['exceptions']['initargs'])
+		@app_commands.describe(**self.bot.language.commands['exceptions']['describe'])
+		@app_commands.rename(**self.bot.language.commands['exceptions']['rename'])
 		async def command_exceptions(interaction: discord.Interaction, page: int = None):
 			page = 0 if not page or page < 1 else page-1
 			with self.bot.cursor() as cursor:
-				cursor.execute(f'SELECT a.discordid,a.nick,e.start,e.end,e.reason FROM mc_exceptions AS e JOIN mc_accounts AS a ON a.id=e.id ORDER BY start LIMIT {page},25 ')
-				dauni = cursor.fetchall()
-			if dauni:
-				exceptioned = []
-				for discordid,nick,start,end,reason in buinie:
-					member = interaction.guild.get_member(discordid)
-					reason = f'\n**Причина:** {reason}' if reason else ''
-					if member:
-						exceptioned.append(f'**{member.mention}** (**{nick}**)\n**Получено:** <t:{start}:R>\n**Истекает:** <t:{end}:R>{reason}\n')
-					else:
-						exceptioned.append(f'**{nick}**\n**Получено:** <t:{start}:R>\n**Истекает:** <t:{end}:R>{reason}\n')
-				if exceptioned:
-					exceptioned = ''.join(exceptioned)
-					embed = discord.Embed(
-						title= 'Список исключенных',
-						description = f'Вот они, игровые импотенты.\n\n{exceptioned}',
-						colour = discord.Colour.red()
-					)
-					await interaction.response.send_message(embed=embed,ephemeral=False)
-					return
-
-			embed = discord.Embed(description = f'Исключенные не найдены.',colour = discord.Colour.red())
-			await interaction.response.send_message(embed=embed,ephemeral=True)
+				cursor.execute(f'SELECT a.nick,a.discordid,e.start,e.end,e.reason FROM mc_exceptions AS e JOIN mc_accounts AS a ON a.id=e.id ORDER BY start LIMIT {page},25 ')
+				players = cursor.fetchall()
+			if not players:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['exceptions']['messages']['empty-exception-list'])
+				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+				return
+			l = []
+			for nick,discordid,start_time,end_time,reason in players:
+				user = interaction.guild.get_member(discordid)
+				nick = nick.replace('_','\\_')
+				reason = Template(self.bot.language.commands['exceptions']['messages']['reason-format']).safe_substitute(reason=reason) if reason else ''
+				if user:
+					user = Template(self.bot.language.commands['exceptions']['messages']['user-format']).safe_substitute(user=user.mention)
+					player = Template(self.bot.language.commands['exceptions']['messages']['player-format']).safe_substitute(start_time=start_time,end_time=end_time,reason=reason,user=user,nick=nick)
+				else:
+					player = Template(self.bot.language.commands['exceptions']['messages']['player-format']).safe_substitute(start_time=start_time,end_time=end_time,reason=reason,user='',nick=nick)
+				l.append(player)
+			l = (self.bot.language.commands['exceptions']['messages']['join-by']).join(l)
+			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['exceptions']['messages']['exception-list']).safe_substitute(players=l))
+			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
 
 		command_init = self.bot.language.commands['referals_top']['init']
 		@command_init.command(**self.bot.language.commands['referals_top']['initargs'])
