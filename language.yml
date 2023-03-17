@@ -599,6 +599,8 @@ commands:
 
       invalid-registration-user: '{"embeds": [{"description": "Вы не являетесь участником данной регистрации","color": 16711680}]}'
 
+      default-registration-button-title: 'Нажмите для продолжения'
+    # regsister channel:
       nick-format: '**Никнейм:** ${nick}\n'
       user-format: '**Discord аккаунт:** ${user}\n'
       # ${raw_nick} - ник пользователя
@@ -609,15 +611,14 @@ commands:
       embed-description: '${nick}${user}'
       content: ''
 
+      referal-field-name: 'Пригласивший'
+      # ${user} - упоминание пользователя, который пригласил
+      referal-field-value: '${user}'
+
       accept-button-label: 'Одобрить'
       accept-button-color: 3
       decline-button-label: 'Отклонить'
       decline-button-color: 4
-
-      # ${time} - среднее время обработки в формате 15 минут/секунд..
-      average-time-format: '\nСреднее время обработки заявки ${time}'
-      dm-create-message: '{"embeds": [{"title":"Регистрация crewpvp.xyz","description": "Заявка на регистрацию создана.\nОжидайте решение модерации${time}","color": 65280}]}'
-      response-create-message: '{"embeds": [{"description": "Заявка на регистрацию создана.\nОжидайте решение модерации${time}","color": 65280}]}'
 
       # ${time} - время в формате UNIX TIME
       # ${user} - упоминание пользователя, который ответил на заявку
@@ -632,10 +633,18 @@ commands:
       author-leaved-field-name: 'Отклонено <t:${time}:R>'
       author-leaved-field-value: 'Автор заявки покинул Discord сервер'
 
+    # user dm or channel  
+      # ${time} - среднее время обработки в формате 15 минут/секунд..
+      average-time-format: '\nСреднее время обработки заявки ${time}'
+      dm-create-message: '{"embeds": [{"title":"Регистрация crewpvp.xyz","description": "Заявка на регистрацию создана.\nОжидайте решение модерации${time}","color": 65280}]}'
+      channel-create-message: '{"embeds": [{"description": "Заявка на регистрацию создана.\nОжидайте решение модерации${time}","color": 65280}]}'
+
       # ${unix_time} - время когда истекает задержка для создания заявки в формате UNIX TIME
       # ${relative_time} - время через сколько истекает задержка в формате 15 минут/секунд...
       channel-leaved-message: '{"embeds": [{"description": "Ваша заявка была отклонена, так как вы покинули Discord сервер","color": 16711680}]}'
 
+      # ${unix_time} - время когда истекает задержка для создания заявки в формате UNIX TIME
+      # ${relative_time} - время через сколько истекает задержка в формате 15 минут/секунд...
       dm-accepted-message: '{"embeds": [{"title":"Регистрация crewpvp.xyz","description": "Ваша заявка была одобрена! Приятной игры!","color": 65280}]}'
       
       # ${reason} - причина указанная в отклонении
