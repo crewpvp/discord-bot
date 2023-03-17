@@ -515,7 +515,6 @@ class DiscordMinecraft:
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['referals_mine']['messages']['referals-list']).safe_substitute(count=count,players=l))
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-
 		async def interaction(interaction: discord.Interaction):
 			if interaction.type == discord.InteractionType.component:
 				customid = interaction.data['custom_id']
@@ -549,8 +548,8 @@ class DiscordMinecraft:
 							cursor.execute(f'UPDATE mc_inactive_recovery SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE messageid={interaction.message.id}')
 							embed = interaction.message.embeds[0]
 							time = int(datetime.now().timestamp())
-							field_name = Template(self.bot.language.commands['ticket_create']['messages']['author-leaved-field-name']).safe_substitute(time=time,user=interaction.user.mention)
-							field_value = Template(self.bot.language.commands['ticket_create']['messages']['author-leaved-field-value']).safe_substitute(time=time,user=interaction.user.mention)
+							field_name = Template(self.bot.language.commands['recovery']['messages']['author-leaved-field-name']).safe_substitute(time=time,user=interaction.user.mention)
+							field_value = Template(self.bot.language.commands['recovery']['messages']['author-leaved-field-value']).safe_substitute(time=time,user=interaction.user.mention)
 							embed.add_field(name=field_name,value=field_value)
 							await interaction.response.edit_message(view=None,embed=embed)
 				elif customid == "inactive_recovery_disapprove":
@@ -590,9 +589,7 @@ class DiscordMinecraft:
 							else:
 								if referal:
 									referal = interaction.guild.get_member(referal)
-								message = await interaction.guild.get_channel(self.channel).send(content='Обработка новой заявки..')
-								cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
-								await self.on_registration_send(interaction,id,nick,message, referal)
+								await self.create_register(interaction,id,nick,referal)	
 						else:
 							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['invalid-registration-user'])
 							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
@@ -615,9 +612,7 @@ class DiscordMinecraft:
 							else:
 								if referal:
 									referal = interaction.guild.get_member(referal)
-								message = await interaction.guild.get_channel(self.channel).send(content='Обработка новой заявки..')
-								cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
-								await self.on_registration_send(interaction,id,nick,message, referal)
+								await self.create_register(interaction,id,nick,referal)	
 						else:
 							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['invalid-registration-user'])
 							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
@@ -645,10 +640,30 @@ class DiscordMinecraft:
 								await member.add_roles(interaction.guild.get_role(self.registered_role))
 							except:
 								pass
-							await self.on_registration_approve(interaction, member, channel)
+							embed = interaction.message.embeds[0]
+							time = int(datetime.now().timestamp())
+							field_name = Template(self.bot.language.commands['register']['messages']['accepted-field-name']).safe_substitute(time=time,user=interaction.user.mention)
+							field_value = Template(self.bot.language.commands['register']['messages']['accepted-field-value']).safe_substitute(time=time,user=interaction.user.mention)
+							embed.add_field(name=field_name,value=field_value)
+							await interaction.response.edit_message(content=None,view=None,embed=embed)
+
+							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['dm-accepted-message'])
+							try:
+								await member.send(embeds=embeds,content=content)
+							except:
+								pass
+							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['channel-accepted-message'])
+							channel.send(embeds=embeds,content=content)
 						else:
 							cursor.execute(f'UPDATE mc_registrations SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE messageid={interaction.message.id}')
-							await self.on_registration_user_leave(interaction, channel)
+							embed = interaction.message.embeds[0]
+							time = int(datetime.now().timestamp())
+							field_name = Template(self.bot.language.commands['register']['messages']['author-leaved-field-name']).safe_substitute(time=time,user=interaction.user.mention)
+							field_value = Template(self.bot.language.commands['register']['messages']['author-leaved-field-value']).safe_substitute(time=time,user=interaction.user.mention)
+							embed.add_field(name=field_name,value=field_value)
+							await interaction.response.edit_message(view=None,embed=embed)
+							content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-leaved-message']).safe_substitute(unix_time=unix_time,relative_time=relative_time))
+							channel.send(embeds=embeds,content=content)
 				elif customid == 'unlink_account':
 					await command_unlink.callback(interaction, app_commands.Choice(name='маня мирок', value=int(interaction.data['values'][0])))
 			elif interaction.type == discord.InteractionType.modal_submit:
@@ -660,7 +675,7 @@ class DiscordMinecraft:
 							with self.bot.cursor() as cursor:
 								cursor.execute(f'SELECT ((SUM(closed)-SUM(sended))/COUNT(*)) FROM mc_inactive_recovery WHERE closed IS NOT NULL AND sended IS NOT NULL')
 								values = cursor.fetchone()
-							if values[0]:
+							if values:
 								time = relativeTimeParser(seconds=values[0],greater=True)
 								time = Template(self.bot.language.commands['recovery']['messages']['average-time-format']).safe_substitute(time=time)
 							else:
@@ -675,7 +690,8 @@ class DiscordMinecraft:
 							answers = [component['components'][0]['value'] for component in interaction.data['components']]
 							await self.create_inactive_recovery(interaction.user, answers)
 						else:
-							await self.on_inactive_recovery_exists(interaction)
+							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['recovery']['messages']['active-recovery-exists'])
+							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				elif customid == "inactive_recovery_disapprove":
 					reason = interaction.data['components'][0]['components'][0]['value']
 					with self.bot.cursor() as cursor:
@@ -699,8 +715,8 @@ class DiscordMinecraft:
 							cursor.execute(f'UPDATE mc_inactive_recovery SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE messageid={interaction.message.id}')
 							embed = interaction.message.embeds[0]
 							time = int(datetime.now().timestamp())
-							field_name = Template(self.bot.language.commands['ticket_create']['messages']['author-leaved-field-name']).safe_substitute(time=time,user=interaction.user.mention)
-							field_value = Template(self.bot.language.commands['ticket_create']['messages']['author-leaved-field-value']).safe_substitute(time=time,user=interaction.user.mention)
+							field_name = Template(self.bot.language.commands['recovery']['messages']['author-leaved-field-name']).safe_substitute(time=time,user=interaction.user.mention)
+							field_value = Template(self.bot.language.commands['recovery']['messages']['author-leaved-field-value']).safe_substitute(time=time,user=interaction.user.mention)
 							embed.add_field(name=field_name,value=field_value)
 							await interaction.response.edit_message(view=None,embed=embed)
 				elif customid == "registration_start_bedrock":
@@ -743,9 +759,7 @@ class DiscordMinecraft:
 							else:
 								if referal:
 									referal = interaction.guild.get_member(referal)
-								message = await interaction.guild.get_channel(self.channel).send(content='Обработка новой заявки..')
-								cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
-								await self.on_registration_send(interaction,id,nick,message,referal)	
+								await self.create_register(interaction,id,nick,referal)	
 						else:
 							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['invalid-registration-user'])
 							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
@@ -757,11 +771,36 @@ class DiscordMinecraft:
 						channel = interaction.guild.get_channel(channelid)
 						member = interaction.guild.get_member(discordid)
 						if member:
-							cursor.execute(f'UPDATE mc_registrations SET closed=UNIX_TIMESTAMP(), close_reason = \'{reason}\' WHERE messageid={interaction.message.id}')
-							await self.on_registration_disapprove(interaction,reason,member,channel)
+							cursor.execute(f'UPDATE mc_inactive_recovery SET closed=UNIX_TIMESTAMP(), close_reason = \'{reason}\' WHERE messageid={interaction.message.id}')
+							embed = interaction.message.embeds[0]
+							time = int(datetime.now().timestamp())
+							unix_time = time+self.cooldown
+							relative_time = relativeTimeParser(seconds=self.cooldown,greater=True)
+							
+							reason_format = Template(self.bot.language.commands['register']['messages']['declined-reason-format']).safe_substitute(reason=reason)
+							field_name = Template(self.bot.language.commands['register']['messages']['declined-field-name']).safe_substitute(reason=reason_format,time=time,user=interaction.user.mention)
+							field_value = Template(self.bot.language.commands['register']['messages']['declined-field-value']).safe_substitute(reason=reason_format,time=time,user=interaction.user.mention)
+							await interaction.response.edit_message(view=None,embed=embed)
+
+							reason_format = Template(self.bot.language.commands['register']['messages']['dm-declined-reason-format']).safe_substitute(reason=reason)
+							content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['dm-declined-message']).safe_substitute(unix_time=unix_time,relative_time=relative_time,reason=reason_format))
+							try:
+								await member.send(embeds=embeds,content=content)
+							except:
+								pass
+							reason_format = Template(self.bot.language.commands['register']['messages']['channel-declined-reason-format']).safe_substitute(reason=reason)
+							content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-declined-message']).safe_substitute(unix_time=unix_time,relative_time=relative_time,reason=reason_format))
+							channel.send(embeds=embeds,content=content)
 						else:
 							cursor.execute(f'UPDATE mc_registrations SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE messageid={interaction.message.id}')
-							await self.on_registration_user_leave(interaction, channel)
+							embed = interaction.message.embeds[0]
+							time = int(datetime.now().timestamp())
+							field_name = Template(self.bot.language.commands['register']['messages']['author-leaved-field-name']).safe_substitute(time=time,user=interaction.user.mention)
+							field_value = Template(self.bot.language.commands['register']['messages']['author-leaved-field-value']).safe_substitute(time=time,user=interaction.user.mention)
+							embed.add_field(name=field_name,value=field_value)
+							await interaction.response.edit_message(view=None,embed=embed)
+							content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-leaved-message']).safe_substitute(unix_time=unix_time,relative_time=relative_time))
+							channel.send(embeds=embeds,content=content)
 		self.interaction = interaction
 
 		async def check(num):
@@ -942,10 +981,10 @@ class DiscordMinecraft:
 
 		if 'button' in stage:
 			button = stage['button']
-			title = button['title'] if 'title' in button else 'Нажмите для продолжения'
+			title = button['title'] if 'title' in button else self.bot.language.commands['register']['messages']['default-registration-button-title']
 			color = discord.ButtonStyle(button['color']) if 'color' in button else discord.ButtonStyle.green
 		else:
-			title = 'Нажмите для продолжения'
+			title = self.bot.language.commands['register']['messages']['default-registration-button-title']
 			color = discord.ButtonStyle.green
 
 		component = discord.ui.View(timeout=None)
@@ -981,98 +1020,49 @@ class DiscordMinecraft:
 				final.append([stage['title'],stage['choose'][question]['title']])
 		return final
 	
-
-	async def on_registration_user_leave(self,interaction: discord.Interaction, channel): #произошло взаимодействие с заявкой от ливнувшего пользователя
-		embed = interaction.message.embeds[0]
-		time = int(datetime.now().timestamp())
-		embed.add_field(name=f'Отклонена <t:{time}:R>',value=f'{interaction.user.mention}\nПричина: покинул Discord сервер')
-		await interaction.response.edit_message(view=None,embed=embed)
-		embed = discord.Embed(
-			title = 'Регистрация',
-			description = f'**Ваша заявка отклонена**\nБыл покинут Discord сервер',
-			colour = discord.Colour.from_rgb(100, 100, 100)
-			)
-		embed.set_footer(text=f'Вы сможете повторить попытку через {relativeTimeParser(seconds=self.cooldown)}')
-		await channel.send(embed=embed)
-	async def on_registration_approve(self,interaction: discord.Interaction,member: discord.Member, channel): #Регистрация принята
-		embed = interaction.message.embeds[0]
-		time = int(datetime.now().timestamp())
-		embed.add_field(name=f'Одобрена <t:{time}:R>',value=f'{interaction.user.mention}')
-		await interaction.response.edit_message(content=None,view=None,embed=embed)
-
-		embed = discord.Embed(colour = discord.Colour.from_rgb(100, 100, 100))
-		inactive_time = relativeTimeParser(seconds=self.inactive_time, greater=True)
-		#talkchannel = interaction.guild.get_channel(978972919826890752)
-		#infochannel = interaction.guild.get_channel(967423687965966336)
-		registered_role = interaction.guild.get_role(self.registered_role)
-
-		embed.add_field(name=f'Регистрация crewpvp.xyz',value=f'Поздравляем, ваша заявка была одобрена! Приятной игры!',inline=False)
-		embed.add_field(name=f'Вам выдана роль с доступом к разделу Minecraft',value=f'Познакомьтесь с другими пользователями, имеющими роль <@&{self.registered_role}>\nСделать это можно в канале <#978972919826890752>\nБудьте уверены, большинство будет радо пообщаться и поиграть вместе!',inline=False)
-		embed.add_field(name=f'Информбюро: о режимах',value=f'У сервера существует информбюро «о режимах»\nНайти его можно по ссылке [info.crewpvp.xyz](https://info.crewpvp.xyz/) или в канале <#967423687965966336>',inline=False)
-		embed.add_field(name=f'Информбюро: тикеты',value=f'Вам нужна помощь? Напишите свой вопрос в тикете, мы поможем.\n Канал: <#1022157438033608774>',inline=False)
-		await channel.send(content=None,view=None,embed=embed)
-
-		embed = discord.Embed(
-			colour = discord.Colour.from_rgb(100, 100, 100)
-			)
-		embed.add_field(name=f'Регистрация crewpvp.xyz',value=f'Поздравляем, вы были добавлены в вайтлист! Приятной игры!',inline=False)
-		#embed.add_field(name=f'Вам выдана роль с доступом к разделу Minecraft',value=f'Познакомьтесь с другими пользователями, имеющими роль **@{registered_role.name}**\nСделать это можно в канале [\#{talkchannel.name}](https://discord.com/channels/235025729392214016/{talkchannel.id})\nБудьте уверены, большинство будет радо пообщаться и поиграть с новичками!',inline=False)
-		#embed.add_field(name=f'Информбюро: о режимах',value=f'У сервера существует информбюро «о режимах»\nНайти его можно в канале [\#{infochannel.name}](https://discord.com/channels/235025729392214016/{infochannel.id}) или по ссылке *.crewpvp.xyz',inline=False)
-		embed.add_field(name=f'Информбюро: тикеты',value=f'Если у вас возникли вопросы, задайте их в тикете и мы вам ответим.\nПеред созданием тикета, ознакомьтесь с интересующим вас разделом, в информбюро [«о режимах»](*.crewpvp.xyz)',inline=False)
-		embed.add_field(name=f'Внимание!',value=f'Если вы покинете наш Discord, ваш аккаунт будет помечен как инактивный.\nВ случае неактивности более {inactive_time} ваш аккаунт так же будет помечен как инактивный.',inline=False)
-		try:
-			await member.send(embed=embed)
-		except:
-			pass
-	async def on_registration_disapprove(self,interaction: discord.Interaction,reason: str, member: discord.Member, channel): #Регистрация отклонена
-		embed = interaction.message.embeds[0]
-		time = int(datetime.now().timestamp())
-		embed.add_field(name=f'Отклонена <t:{time}:R>',value=f'{interaction.user.mention}\nПричина: {reason}')
-		await interaction.response.edit_message(view=None,embed=embed)
-
-		embed = discord.Embed(
-			title = 'Регистрация',
-			description = f'**Ваша заявка отклонена**\nКомментарий модерации:\n{reason}',
-			colour = discord.Colour.from_rgb(100, 100, 100)
-			)
-		embed.set_footer(text=f'Вы сможете повторить попытку через {relativeTimeParser(seconds=self.cooldown)}')
-		await channel.send(embed=embed)
-
-		embed.title='Регистрация crewpvp.xyz'
-		try:
-			await registration_member.send(embed=embed)
-		except:
-			pass
-	async def on_registration_send(self,interaction: discord.Interaction,id:int,nick:str,message, referal): #Пользователь прошел все стадии регистрации
+	async def create_register(self,interaction,nick, id, referal):
 		with self.bot.cursor() as cursor:
 			cursor.execute("SELECT ((SUM(closed)-SUM(sended))/COUNT(*)) FROM mc_registrations WHERE closed IS NOT NULL AND sended IS NOT NULL")
 			values = cursor.fetchone()
-		if values[0]:
-			time = f'\nСреднее время обработки заявки: **`{relativeTimeParser(seconds=values[0],greater=True)}`**'
+		if values:
+			time = relativeTimeParser(seconds=values[0],greater=True)
+			time = Template(self.bot.language.commands['register']['messages']['average-time-format']).safe_substitute(time=time)
 		else:
 			time = ""
 
+		content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-create-message']).safe_substitute(time=time))
+		await interaction.response.edit_message(embeds=embeds,content=content,ephemeral=True)	
+		try:
+			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['dm-create-message']).safe_substitute(time=time))
+			await interaction.user.send(embeds=embeds,content=content)
+		except:
+			pass
+
+		raw_user = interaction.user.mention
+		user = Template(self.bot.language.commands['register']['messages']['user-format']).safe_substitute(user=raw_user)
+		raw_nick = nick.replace('_','\\_')
+		nick = Template(self.bot.language.commands['register']['messages']['nick-format']).safe_substitute(nick=raw_nick)
 		embed = discord.Embed(
-			title = 'Регистрация',
-			description = f'Заявка на вступление в вайтлист создана\nОжидайте решения модерации{time}',
+			title = Template(self.bot.language.commands['register']['messages']['embed-title']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user),
+			description = Template(self.bot.language.commands['register']['messages']['embed-description']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user).replace('\\n','\n'),
 			colour = discord.Colour.from_rgb(100, 100, 100)
-			)
-		
-		await interaction.response.edit_message(view=None,content=None,embed=embed)
-		nick = nick.replace('_','\\_')
-		time = int(datetime.now().timestamp())
-		embed = discord.Embed(title = f'Заявка {nick}',colour = discord.Colour.from_rgb(100, 100, 100))
-		embed.add_field(name=f'Получена <t:{time}:R>', value=f'От {interaction.user.mention}', inline=False)
+		)
 		if referal:
-			embed.add_field(name=f'Был приглашён', value=referal.mention, inline=False)
-		
+			field_name = Template(self.bot.language.commands['register']['messages']['referal-field-name']).safe_substitute(user=referal.mention)
+			field_value =  Template(self.bot.language.commands['register']['messages']['referal-field-value']).safe_substitute(user=referal.mention)
+			embed.add_field(name=field_name, value=field_value, inline=False)
+		content = Template(self.bot.language.commands['register']['messages']['content']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user)
 		for answer in self.parseAnswers(id):
 			embed.add_field(name=answer[0],value=answer[1],inline=False)
-
 		view = discord.ui.View(timeout=None)
-		view.add_item(discord.ui.Button(disabled=False,custom_id="registration_approve",label='Одобрить заявку',style=discord.ButtonStyle.green))
-		view.add_item(discord.ui.Button(disabled=False,custom_id="registration_disapprove",label='Отклонить заявку',style=discord.ButtonStyle.danger))
-		await message.edit(content=None,embed=embed,view=view)
+		label = self.bot.language.commands['register']['messages']['accept-button-label']
+		color = discord.ButtonStyle(self.bot.language.commands['register']['messages']['accept-button-color'])
+		view.add_item(discord.ui.Button(disabled=False,custom_id="registration_approve",label=label,style=color))
+		label = self.bot.language.commands['register']['messages']['decline-button-label']
+		color = discord.ButtonStyle(self.bot.language.commands['register']['messages']['decline-button-color'])
+		view.add_item(discord.ui.Button(disabled=False,custom_id="registration_disapprove",label=label,style=color))
+		message = await self.bot.guild().get_channel(self.channel).send(content=content,embed=embed,view=view)
+		cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
 	
 	async def remove_inactive(self, member):
 		with self.bot.cursor() as cursor:

@@ -598,6 +598,59 @@ commands:
       registration-decline-modal-placeholder: 'Шизик не сможет играть? Грустно.'
 
       invalid-registration-user: '{"embeds": [{"description": "Вы не являетесь участником данной регистрации","color": 16711680}]}'
+
+      nick-format: '**Никнейм:** ${nick}\n'
+      user-format: '**Discord аккаунт:** ${user}\n'
+      # ${raw_nick} - ник пользователя
+      # ${raw_user} - упоминание пользователя
+      # ${user} - упоминание по формату
+      # ${nick} - ник по формату
+      embed-title: 'Заявка от ${raw_nick}'
+      embed-description: '${nick}${user}'
+      content: ''
+
+      accept-button-label: 'Одобрить'
+      accept-button-color: 3
+      decline-button-label: 'Отклонить'
+      decline-button-color: 4
+
+      # ${time} - среднее время обработки в формате 15 минут/секунд..
+      average-time-format: '\nСреднее время обработки заявки ${time}'
+      dm-create-message: '{"embeds": [{"title":"Регистрация crewpvp.xyz","description": "Заявка на регистрацию создана.\nОжидайте решение модерации${time}","color": 65280}]}'
+      response-create-message: '{"embeds": [{"description": "Заявка на регистрацию создана.\nОжидайте решение модерации${time}","color": 65280}]}'
+
+      # ${time} - время в формате UNIX TIME
+      # ${user} - упоминание пользователя, который ответил на заявку
+      # ${reason} - причина отказа заявки
+      declined-field-name: 'Отклонено <t:${time}:R>'
+      declined-reason-format: ' по причине ${reason}'
+      declined-field-value: '${user}${reason}'
+
+      accepted-field-name: 'Одобрено <t:${time}:R>'
+      accepted-field-value: '${user}'
+
+      author-leaved-field-name: 'Отклонено <t:${time}:R>'
+      author-leaved-field-value: 'Автор заявки покинул Discord сервер'
+
+      # ${unix_time} - время когда истекает задержка для создания заявки в формате UNIX TIME
+      # ${relative_time} - время через сколько истекает задержка в формате 15 минут/секунд...
+      channel-leaved-message: '{"embeds": [{"description": "Ваша заявка была отклонена, так как вы покинули Discord сервер","color": 16711680}]}'
+
+      dm-accepted-message: '{"embeds": [{"title":"Регистрация crewpvp.xyz","description": "Ваша заявка была одобрена! Приятной игры!","color": 65280}]}'
+      
+      # ${reason} - причина указанная в отклонении
+      dm-declined-reason-format: '\n По причине ${reason}'
+      # ${unix_time} - время когда истекает задержка для создания заявки в формате UNIX TIME
+      # ${relative_time} - время через сколько истекает задержка в формате 15 минут/секунд...
+      dm-declined-message: '{"embeds": [{"title":"Регистрация crewpvp.xyz","description": "Ваша заявка была отклонена!${reason}","color": 16711680}]}'
+
+      channel-accepted-message: '{"embeds": [{"description": "Ваша заявка была одобрена! Приятной игры!","color": 65280}]}'
+      # ${reason} - причина указанная в отклонении
+      channel-declined-reason-format: '\n По причине ${reason}'
+      # ${unix_time} - время когда истекает задержка для создания заявки в формате UNIX TIME
+      # ${relative_time} - время через сколько истекает задержка в формате 15 минут/секунд...
+
+      channel-declined-message: '{"embeds": [{"description": "Ваша заявка была отклонена!${reason}","color": 16711680}]}'
   link:
     name: 'link'
     description: 'привязать второй аккаунт'
