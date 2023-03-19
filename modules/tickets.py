@@ -4,6 +4,7 @@ from datetime import datetime
 from modules.utils import relativeTimeParser
 from manager import DiscordManager
 from string import Template
+from io import BytesIO
 
 class DiscordTickets:
 	def __init__(self, bot,channel: int, category: int,check_every_seconds: int, answer_roles: [int,...] = [], max_opened_per_user: int = 5):
@@ -156,15 +157,33 @@ class DiscordTickets:
 						cursor.execute(f'SELECT channelid,id FROM discord_tickets WHERE messageid=\'{interaction.message.id}\'')
 						values = cursor.fetchone()
 						cursor.execute(f'UPDATE discord_tickets SET receiver_time=COALESCE(receiver_time, UNIX_TIMESTAMP()), channelid=NULL, receiver=COALESCE(receiver, \'{interaction.user.id}\'), closer=\'{interaction.user.id}\', closed=UNIX_TIMESTAMP() WHERE id={values[1]}')
-					if values and values[0]:
-						if (channel:=interaction.guild.get_channel(values[0])):
-							await channel.delete()
 					embed = interaction.message.embeds[0]
 					time = int(datetime.now().timestamp())
 					field_name = Template(self.bot.language.commands['ticket_create']['messages']['ticket-closed-field-name']).safe_substitute(time=time,user=interaction.user.mention)
 					field_value = Template(self.bot.language.commands['ticket_create']['messages']['ticket-closed-field-value']).safe_substitute(time=time,user=interaction.user.mention)
 					embed.add_field(name=field_name,value=field_value)
 					await interaction.response.edit_message(view=None,embed=embed)
+
+					if values and values[0]:
+						if (channel:=interaction.guild.get_channel(values[0])):
+							thread_name = self.bot.language.commands['ticket_create']['messages']['ticket-history-thread-name']
+							thread = await interaction.message.create_thread(name=thread_name)
+							author = None
+							skip_first = True
+							async for message in channel.history(limit=None,oldest_first=True):
+								if skip_first:
+									skip_first = False
+									continue
+								if message.content or message.embeds or message.attachments:
+									files = [discord.File(BytesIO(await attachment.read(use_cached=False)),filename=attachment.filename) for attachment in message.attachments]
+									if author != message.author:
+										author = message.author
+										await thread.send(content=f'{message.author.mention} <t:{int(message.created_at.timestamp())}:R>:\n{message.content}',embeds=message.embeds,files=files)
+									else:
+										await thread.send(content=message.content,embeds=message.embeds,files=files)
+							await thread.edit(archived=True, locked=True, pinned=False)
+							await channel.delete()
+					
 				elif customid == 'ticket_block':
 					if not bool(set(role.id for role in interaction.user.roles) & set(self.answer_roles)):
 						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['ticket_create']['messages']['no-ticket-permission'])
@@ -183,14 +202,32 @@ class DiscordTickets:
 					embed = interaction.message.embeds[0]
 					embed.add_field(name=field_name,value=field_value)
 					await interaction.response.edit_message(view=None,embed=embed)
+
+					thread_name = self.bot.language.commands['ticket_create']['messages']['ticket-history-thread-name']
 					for channelid, discordid, messageid in values:
-						if (channel:=interaction.guild.get_channel(channelid)):
-							await channel.delete()
 						if (message:=await interaction.channel.fetch_message(messageid)):
 							if message.id != interaction.message.id:
 								embed = message.embeds[0]
 								embed.add_field(name=field_name,value=field_value)
 								await message.edit(view=None,embed=embed)
+						if (channel:=interaction.guild.get_channel(channelid)):
+							if message:
+								thread = await message.create_thread(name=thread_name)
+								author = None
+								skip_first = True
+								async for message in channel.history(limit=None,oldest_first=True):
+									if skip_first:
+										skip_first = False
+										continue
+									if message.content or message.embeds or message.attachments:
+										files = [discord.File(BytesIO(await attachment.read(use_cached=False)),filename=attachment.filename) for attachment in message.attachments]
+										if author != message.author:
+											author = message.author
+											await thread.send(content=f'{message.author.mention} <t:{int(message.created_at.timestamp())}:R>:\n{message.content}',embeds=message.embeds,files=files)
+										else:
+											await thread.send(content=message.content,embeds=message.embeds,files=files)
+								await thread.edit(archived=True, locked=True, pinned=False)
+							await channel.delete()
 				elif customid == 'ticket_accept':
 					if not bool(set(role.id for role in interaction.user.roles) & set(self.answer_roles)):
 						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['ticket_create']['messages']['no-ticket-permission'])

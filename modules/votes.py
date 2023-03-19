@@ -76,6 +76,12 @@ class DiscordVotes:
 			start = int(datetime.now().timestamp())
 			end = start+time
 
+			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['vote']['messages']['vote-format']).safe_substitute(time=end))
+			view = discord.ui.View(timeout=None)
+			options = [discord.SelectOption(label=value['label'],value=value['value'],description=value['description']) for value in values]
+			view.add_item(discord.ui.Select(custom_id="vote",disabled=False, min_values=min, max_values=max, placeholder=placeholder, options=options))
+			message = await interaction.channel.send(embeds=embeds,content=content,view=view)
+
 			request = []
 			for value in values:
 				label = value['label']
@@ -94,11 +100,7 @@ class DiscordVotes:
 					cursor.execute(f'INSERT INTO discord_votes (id,channelid,end) VALUES(\'{message.id}\',\'{interaction.channel_id}\',\'{end}\')')
 				cursor.execute(f'INSERT INTO discord_votes_values VALUES {request}')
 
-			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['vote']['messages']['vote-format']).safe_substitute(time=end))
-			view = discord.ui.View(timeout=None)
-			options = [discord.SelectOption(label=value['label'],value=value['value'],description=value['description']) for value in values]
-			view.add_item(discord.ui.Select(custom_id="vote",disabled=False, min_values=min, max_values=max, placeholder=placeholder, options=options))
-			await interaction.channel.send(embeds=embeds,content=content,view=view)
+			
 
 			content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['vote']['messages']['vote-created'])
 			await interaction.response.send_message(content=content,embeds=embeds,ephemeral=True)
@@ -139,9 +141,8 @@ class DiscordVotes:
 			votes = cursor.fetchall()
 			if votes:
 				for id, channelid, start, end, placeholder in votes:
-					try:
-						message = await self.bot.guild().get_channel(channelid).fetch_message(id)
-
+					message = await self.bot.guild().get_channel(channelid).fetch_message(id)
+					if message:
 						values = []
 						labels = []
 						descriptions = []
@@ -165,14 +166,11 @@ class DiscordVotes:
 						for i in range(len(labels)):
 							description = Template(self.bot.language.commands['vote']['messages']['description']).safe_substitute(description=descriptions[i]) if descriptions[i] else ''
 							voices.append(Template(self.bot.language.commands['vote']['messages']['vote-voice-format']).safe_substitute(label=labels[i],description=description,amount=values[i]))
-						(self.bot.language.commands['vote']['messages']['join-by']).join(voices)
+						voices = (self.bot.language.commands['vote']['messages']['join-by']).join(voices)
 						
 						content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['vote']['messages']['ended-vote-format']).safe_substitute(end_time=end,start_time=start,voices=voices))
-						await self.on_vote_end(message,vote_result)
 
-						message.edit(embeds=embeds, content=content,view=None)
-					except:
-						pass
+						await message.edit(embeds=embeds, content=content,view=None)
 				cursor.execute(f'DELETE FROM discord_votes WHERE end<UNIX_TIMESTAMP()')
 			cursor.close()
 		self.check = check

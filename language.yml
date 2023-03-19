@@ -312,6 +312,9 @@ commands:
       first-join-format: '**Регистрация:** <t:${time}:R>'
       # ${time} - время в формате 15 секунд/минут..
       time-played-format: '**Время игры:** ${time}' 
+      # ${time} - время в формате UNIX TIME
+      #exception-start-format: '**Блокировка получена** <t:${time}:R>'
+      exception-end-format: '**Блокировка истекает:** <t:${time}:R>'
       referal-word-1: 'человека'
       referal-word-2: 'человека'
       referal-word-3: 'человек'
@@ -418,6 +421,7 @@ commands:
       # ${channel_link} - ссылка на созданный канал
       ticket-accepted: '{"embeds": [{"description": "Тикет принят, перейдите в [канал](${channel_link})","color": 65280}]}'
 
+      ticket-history-thread-name: 'История тикета'
       # ${time} - среднее время ответа в формате 15 секунд/минут..
       average-time-format: 'Среднее время ответа ${time}'
       form-title: 'Создание тикета'
@@ -531,7 +535,6 @@ commands:
       decline-modal-title: 'Отказ заявки'
       decline-modal-label: 'Опишите причину отказа'
       decline-modal-placeholder: 'Шизик не сможет вернуться? Грустно (х2).'
-
   authorize:
     name: 'authorize'
     description: 'авторизовать игровой аккаунт'

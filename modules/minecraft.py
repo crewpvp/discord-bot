@@ -232,6 +232,10 @@ class DiscordMinecraft:
 				else:
 					content,embeds,component = self.parseQuestions(start_stage)
 				await channel.send(content = content, embeds = embeds, view = component)
+				channel_link = f'https://discord.com/channels/{self.bot.guild_id}/{channel.id}'
+				channel_name = channel.name
+				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['registration-started']).safe_substitute(channel_name=channel_name,channel_link=channel_link))
+				await interaction.response.send_message(content = content, embeds = embeds, ephemeral=True)
 
 		command_init = self.bot.language.commands['link']['init']
 		@command_init.command(**self.bot.language.commands['link']['initargs'])
@@ -399,7 +403,7 @@ class DiscordMinecraft:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['exception_member']['messages']['account-not-found'])
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				return
-			await command_exception_nick.callback(nick=data[0],days=days,reason=reason)
+			await command_exception_nick.callback(interaction=interaction,nick=data[0],days=days,reason=reason)
 		
 		command_init = self.bot.language.commands['unexception_nick']['init']
 		@command_init.command(**self.bot.language.commands['unexception_nick']['initargs'])
@@ -429,7 +433,7 @@ class DiscordMinecraft:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['unexception_member']['messages']['account-not-found'])
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				return
-			await command_unexception_nick.callback(nick=data[0])
+			await command_unexception_nick.callback(interaction=interaction,nick=data[0])
 
 		command_init = self.bot.language.commands['exceptions']['init']
 		@command_init.command(**self.bot.language.commands['exceptions']['initargs'])
@@ -563,7 +567,7 @@ class DiscordMinecraft:
 						cursor.execute(f'SELECT stage FROM mc_registrations WHERE discordid={interaction.user.id} AND channelid={interaction.channel_id}')
 						stage = cursor.fetchone()
 						if stage:
-							сurrent_stage = stage[0]
+							current_stage = stage[0]
 							content,embeds,component = self.parseQuestions(current_stage)
 							if self.isFormStage(current_stage):
 								await interaction.response.send_modal(component)
@@ -589,7 +593,7 @@ class DiscordMinecraft:
 							else:
 								if referal:
 									referal = interaction.guild.get_member(referal)
-								await self.create_register(interaction,id,nick,referal)	
+								await self.create_register(interaction,nick,id,referal)	
 						else:
 							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['invalid-registration-user'])
 							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
@@ -612,7 +616,7 @@ class DiscordMinecraft:
 							else:
 								if referal:
 									referal = interaction.guild.get_member(referal)
-								await self.create_register(interaction,id,nick,referal)	
+								await self.create_register(interaction,nick,id,referal)	
 						else:
 							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['invalid-registration-user'])
 							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
@@ -653,7 +657,7 @@ class DiscordMinecraft:
 							except:
 								pass
 							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['channel-accepted-message'])
-							channel.send(embeds=embeds,content=content)
+							await channel.send(embeds=embeds,content=content)
 						else:
 							cursor.execute(f'UPDATE mc_registrations SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE messageid={interaction.message.id}')
 							embed = interaction.message.embeds[0]
@@ -663,7 +667,7 @@ class DiscordMinecraft:
 							embed.add_field(name=field_name,value=field_value)
 							await interaction.response.edit_message(view=None,embed=embed)
 							content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-leaved-message']).safe_substitute(unix_time=unix_time,relative_time=relative_time))
-							channel.send(embeds=embeds,content=content)
+							await channel.send(embeds=embeds,content=content)
 				elif customid == 'unlink_account':
 					await command_unlink.callback(interaction, app_commands.Choice(name='маня мирок', value=int(interaction.data['values'][0])))
 			elif interaction.type == discord.InteractionType.modal_submit:
@@ -675,7 +679,7 @@ class DiscordMinecraft:
 							with self.bot.cursor() as cursor:
 								cursor.execute(f'SELECT ((SUM(closed)-SUM(sended))/COUNT(*)) FROM mc_inactive_recovery WHERE closed IS NOT NULL AND sended IS NOT NULL')
 								values = cursor.fetchone()
-							if values:
+							if values[0]:
 								time = relativeTimeParser(seconds=values[0],greater=True)
 								time = Template(self.bot.language.commands['recovery']['messages']['average-time-format']).safe_substitute(time=time)
 							else:
@@ -704,6 +708,7 @@ class DiscordMinecraft:
 							reason_format = Template(self.bot.language.commands['recovery']['messages']['declined-reason-format']).safe_substitute(reason=reason)
 							field_name = Template(self.bot.language.commands['recovery']['messages']['declined-field-name']).safe_substitute(reason=reason_format,time=time,user=interaction.user.mention)
 							field_value = Template(self.bot.language.commands['recovery']['messages']['declined-field-value']).safe_substitute(reason=reason_format,time=time,user=interaction.user.mention)
+							embed.add_field(name=field_name,value=field_value)
 							await interaction.response.edit_message(view=None,embed=embed)
 							reason_format = Template(self.bot.language.commands['recovery']['messages']['dm-declined-reason-format']).safe_substitute(reason=reason)
 							content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['recovery']['messages']['dm-declined-message']).safe_substitute(reason=reason_format))
@@ -759,7 +764,7 @@ class DiscordMinecraft:
 							else:
 								if referal:
 									referal = interaction.guild.get_member(referal)
-								await self.create_register(interaction,id,nick,referal)	
+								await self.create_register(interaction,nick,id,referal)	
 						else:
 							content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['invalid-registration-user'])
 							await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
@@ -780,6 +785,7 @@ class DiscordMinecraft:
 							reason_format = Template(self.bot.language.commands['register']['messages']['declined-reason-format']).safe_substitute(reason=reason)
 							field_name = Template(self.bot.language.commands['register']['messages']['declined-field-name']).safe_substitute(reason=reason_format,time=time,user=interaction.user.mention)
 							field_value = Template(self.bot.language.commands['register']['messages']['declined-field-value']).safe_substitute(reason=reason_format,time=time,user=interaction.user.mention)
+							embed.add_field(name=field_name,value=field_value)
 							await interaction.response.edit_message(view=None,embed=embed)
 
 							reason_format = Template(self.bot.language.commands['register']['messages']['dm-declined-reason-format']).safe_substitute(reason=reason)
@@ -790,7 +796,7 @@ class DiscordMinecraft:
 								pass
 							reason_format = Template(self.bot.language.commands['register']['messages']['channel-declined-reason-format']).safe_substitute(reason=reason)
 							content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-declined-message']).safe_substitute(unix_time=unix_time,relative_time=relative_time,reason=reason_format))
-							channel.send(embeds=embeds,content=content)
+							await channel.send(embeds=embeds,content=content)
 						else:
 							cursor.execute(f'UPDATE mc_registrations SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE messageid={interaction.message.id}')
 							embed = interaction.message.embeds[0]
@@ -800,7 +806,7 @@ class DiscordMinecraft:
 							embed.add_field(name=field_name,value=field_value)
 							await interaction.response.edit_message(view=None,embed=embed)
 							content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-leaved-message']).safe_substitute(unix_time=unix_time,relative_time=relative_time))
-							channel.send(embeds=embeds,content=content)
+							await channel.send(embeds=embeds,content=content)
 		self.interaction = interaction
 
 		async def check(num):
@@ -823,7 +829,7 @@ class DiscordMinecraft:
 			#
 			with self.bot.cursor() as cursor:
 				if 'premium' in self.bot.enabled_modules:
-					cursor.execute(f'SELECT a.discordid FROM mc_accounts AS a JOIN discord_premium AS p ON p.discordid=a.discordid WHERE COALESCE(p.end,0)<UNIX_TIMESTAMP() AND a.inactive=FALSE AND UNIX_TIMESTAMP()-a.last_join>{self.inactive_time}')
+					cursor.execute(f'SELECT a.discordid FROM mc_accounts AS a LEFT JOIN discord_premium AS p ON p.discordid=a.discordid WHERE COALESCE(p.end,0)<UNIX_TIMESTAMP() AND a.inactive=FALSE AND UNIX_TIMESTAMP()-a.last_join>{self.inactive_time}')
 				else:
 					cursor.execute(f'SELECT discordid FROM mc_accounts WHERE mc_accounts.inactive=FALSE AND UNIX_TIMESTAMP()-mc_accounts.last_join>{self.inactive_time}')
 				ids = cursor.fetchall()
@@ -1024,45 +1030,45 @@ class DiscordMinecraft:
 		with self.bot.cursor() as cursor:
 			cursor.execute("SELECT ((SUM(closed)-SUM(sended))/COUNT(*)) FROM mc_registrations WHERE closed IS NOT NULL AND sended IS NOT NULL")
 			values = cursor.fetchone()
-		if values:
-			time = relativeTimeParser(seconds=values[0],greater=True)
-			time = Template(self.bot.language.commands['register']['messages']['average-time-format']).safe_substitute(time=time)
-		else:
-			time = ""
+			if values[0]:
+				time = relativeTimeParser(seconds=values[0],greater=True)
+				time = Template(self.bot.language.commands['register']['messages']['average-time-format']).safe_substitute(time=time)
+			else:
+				time = ""
 
-		content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-create-message']).safe_substitute(time=time))
-		await interaction.response.edit_message(embeds=embeds,content=content,ephemeral=True)	
-		try:
-			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['dm-create-message']).safe_substitute(time=time))
-			await interaction.user.send(embeds=embeds,content=content)
-		except:
-			pass
+			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-create-message']).safe_substitute(time=time))
+			await interaction.response.edit_message(embeds=embeds,content=content,view=None)	
+			try:
+				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['dm-create-message']).safe_substitute(time=time))
+				await interaction.user.send(embeds=embeds,content=content)
+			except:
+				pass
 
-		raw_user = interaction.user.mention
-		user = Template(self.bot.language.commands['register']['messages']['user-format']).safe_substitute(user=raw_user)
-		raw_nick = nick.replace('_','\\_')
-		nick = Template(self.bot.language.commands['register']['messages']['nick-format']).safe_substitute(nick=raw_nick)
-		embed = discord.Embed(
-			title = Template(self.bot.language.commands['register']['messages']['embed-title']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user),
-			description = Template(self.bot.language.commands['register']['messages']['embed-description']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user).replace('\\n','\n'),
-			colour = discord.Colour.from_rgb(100, 100, 100)
-		)
-		if referal:
-			field_name = Template(self.bot.language.commands['register']['messages']['referal-field-name']).safe_substitute(user=referal.mention)
-			field_value =  Template(self.bot.language.commands['register']['messages']['referal-field-value']).safe_substitute(user=referal.mention)
-			embed.add_field(name=field_name, value=field_value, inline=False)
-		content = Template(self.bot.language.commands['register']['messages']['content']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user)
-		for answer in self.parseAnswers(id):
-			embed.add_field(name=answer[0],value=answer[1],inline=False)
-		view = discord.ui.View(timeout=None)
-		label = self.bot.language.commands['register']['messages']['accept-button-label']
-		color = discord.ButtonStyle(self.bot.language.commands['register']['messages']['accept-button-color'])
-		view.add_item(discord.ui.Button(disabled=False,custom_id="registration_approve",label=label,style=color))
-		label = self.bot.language.commands['register']['messages']['decline-button-label']
-		color = discord.ButtonStyle(self.bot.language.commands['register']['messages']['decline-button-color'])
-		view.add_item(discord.ui.Button(disabled=False,custom_id="registration_disapprove",label=label,style=color))
-		message = await self.bot.guild().get_channel(self.channel).send(content=content,embed=embed,view=view)
-		cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
+			raw_user = interaction.user.mention
+			user = Template(self.bot.language.commands['register']['messages']['user-format']).safe_substitute(user=raw_user)
+			raw_nick = nick.replace('_','\\_')
+			nick = Template(self.bot.language.commands['register']['messages']['nick-format']).safe_substitute(nick=raw_nick)
+			embed = discord.Embed(
+				title = Template(self.bot.language.commands['register']['messages']['embed-title']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user),
+				description = Template(self.bot.language.commands['register']['messages']['embed-description']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user).replace('\\n','\n'),
+				colour = discord.Colour.from_rgb(100, 100, 100)
+			)
+			if referal:
+				field_name = Template(self.bot.language.commands['register']['messages']['referal-field-name']).safe_substitute(user=referal.mention)
+				field_value =  Template(self.bot.language.commands['register']['messages']['referal-field-value']).safe_substitute(user=referal.mention)
+				embed.add_field(name=field_name, value=field_value, inline=False)
+			content = Template(self.bot.language.commands['register']['messages']['content']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user)
+			for answer in self.parseAnswers(id):
+				embed.add_field(name=answer[0],value=answer[1],inline=False)
+			view = discord.ui.View(timeout=None)
+			label = self.bot.language.commands['register']['messages']['accept-button-label']
+			color = discord.ButtonStyle(self.bot.language.commands['register']['messages']['accept-button-color'])
+			view.add_item(discord.ui.Button(disabled=False,custom_id="registration_approve",label=label,style=color))
+			label = self.bot.language.commands['register']['messages']['decline-button-label']
+			color = discord.ButtonStyle(self.bot.language.commands['register']['messages']['decline-button-color'])
+			view.add_item(discord.ui.Button(disabled=False,custom_id="registration_disapprove",label=label,style=color))
+			message = await self.bot.guild().get_channel(self.channel).send(content=content,embed=embed,view=view)
+			cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
 	
 	async def remove_inactive(self, member):
 		with self.bot.cursor() as cursor:
@@ -1139,10 +1145,10 @@ class DiscordMinecraft:
 		modal.add_item(discord.ui.TextInput(min_length=1,max_length=17,label=label,style=discord.TextStyle.short,required=False, placeholder=placeholder))
 		return modal
 	def registration_decline_modal(self):
-		modal_title = self.bot.language.commands['recovery']['messages']['registration-decline-modal-title']
+		modal_title = self.bot.language.commands['register']['messages']['registration-decline-modal-title']
 		modal = discord.ui.Modal(title=modal_title, custom_id = "registration_disapprove")
-		label = self.bot.language.commands['recovery']['messages']['registration-decline-modal-label']
-		placeholder = self.bot.language.commands['recovery']['messages']['registration-decline-modal-placeholder']
+		label = self.bot.language.commands['register']['messages']['registration-decline-modal-label']
+		placeholder = self.bot.language.commands['register']['messages']['registration-decline-modal-placeholder']
 		modal.add_item(discord.ui.TextInput(max_length=512,label=label,style=discord.TextStyle.paragraph, placeholder=placeholder))
 		return modal
 	
@@ -1171,13 +1177,13 @@ class DiscordMinecraft:
 		if not id:
 			return False
 		with self.bot.cursor() as cursor:
-			cursor.execute(f'SELECT discordid FROM mc_exceptions WHERE id=\'{id}\'')
+			cursor.execute(f'SELECT discordid FROM mc_accounts WHERE id=\'{id}\'')
 			if not (data:=cursor.fetchone()):
 				return False
 			if reason:
-				cursor.execute(f'INSERT INTO mc_exceptions (id,end,reason) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time},?,TRUE) ON DUPLICATE KEY UPDATE end=end+{time}, reason=?',(reason,reason,))
+				cursor.execute(f'INSERT INTO mc_exceptions (id,end,reason) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time},?) ON DUPLICATE KEY UPDATE end=end+{time}, reason=?',(reason,reason,))
 			else:
-				cursor.execute(f'INSERT INTO mc_exceptions (id,end) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time},TRUE) ON DUPLICATE KEY UPDATE isolated=TRUE, end=end+{time})')
+				cursor.execute(f'INSERT INTO mc_exceptions (id,end) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time}) ON DUPLICATE KEY UPDATE isolated=TRUE, end=end+{time})')
 			if(member:=self.bot.guild().get_member(data[0])):
 				await member.add_roles(self.bot.guild().get_role(self.exception_role))
 				return member
@@ -1188,7 +1194,7 @@ class DiscordMinecraft:
 		if not id:
 			return False
 		with self.bot.cursor() as cursor:
-			cursor.execute(f'SELECT discordid FROM mc_exceptions WHERE id=\'{id}\'')
+			cursor.execute(f'SELECT a.discordid FROM mc_exceptions AS e JOIN mc_accounts AS a on a.id=e.id WHERE e.id=\'{id}\'')
 			if (data:=cursor.fetchone()):
 				cursor.execute(f'DELETE FROM mc_exceptions WHERE id=\'{id}\'')
 				if(member:=self.bot.guild().get_member(data[0])):

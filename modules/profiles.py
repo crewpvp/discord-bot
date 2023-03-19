@@ -112,7 +112,7 @@ class DiscordProfiles:
 		@app_commands.rename(**self.bot.language.commands['profile_member']['rename'])
 		async def command_profile_member(interaction: discord.Interaction, member: discord.Member, hide: app_commands.Choice[int] = None):
 			hide = True if (hide==None or hide.value==1) else False
-			name,age,iswoman,premium_start, premium_end, nick, first_join, last_join, time_played,isolator_end,isolator_time = None, None, None, None, None, None, None, None, None, None, None
+			name,age,iswoman,premium_start, premium_end, nick, first_join, last_join, time_played,isolator_end,isolator_time,exception_end, exception_start = None, None, None, None, None, None, None, None, None, None, None, None, None
 			
 			with self.bot.cursor() as cursor:
 				if 'mutes' in self.bot.enabled_modules:
@@ -121,13 +121,10 @@ class DiscordProfiles:
 					if data:
 						isolator_end, isolator_time = data 
 				if 'minecraft' in self.bot.enabled_modules:
-					cursor.execute(f'SELECT id,nick,first_join,last_join,time_played FROM mc_accounts WHERE discordid={member.id} LIMIT 1')
+					cursor.execute(f'SELECT a.id,a.nick,a.first_join,a.last_join,a.time_played,e.start,e.end,l.bedrockUsername FROM mc_accounts AS a LEFT JOIN mc_exceptions AS e ON a.id=e.id LEFT JOIN LinkedPlayers AS l ON l.javaUniqueId=UNHEX(REPLACE(a.id, \'-\', \'\')) WHERE a.discordid={member.id} LIMIT 1')
 					data = cursor.fetchone()
 					if data:
-						id,nick, first_join, last_join, time_played = data
-						cursor.execute(f'SELECT bedrockUsername FROM LinkedPlayers WHERE javaUniqueId=UNHEX(REPLACE(\'{id}\', \'-\', \'\'))')
-						data = cursor.fetchone()
-						subname = data[0] if data else None	
+						id,nick, first_join, last_join, time_played,exception_start, exception_end,subname = data
 					cursor.execute(f'SELECT COUNT(*) FROM mc_referals WHERE user={member.id}')
 					referals_count = cursor.fetchone()[0]
 				if 'premium' in self.bot.enabled_modules:
@@ -151,49 +148,60 @@ class DiscordProfiles:
 				if name or age or iswoman!=None or isolator_time or isolator_end:
 					params = []
 					gender = self.bot.language.commands['profile_member']['messages']['woman-gender'] if iswoman else self.bot.language.commands['profile_member']['messages']['man-gender'] if iswoman!=None else None
-					if gender != None:
+					if gender != None and 'gender-format' in self.bot.language.commands['profile_member']['messages']:
 						params.append(Template(self.bot.language.commands['profile_member']['messages']['gender-format']).safe_substitute(gender=gender))
-					if name:
+					if name and 'name-format' in self.bot.language.commands['profile_member']['messages']:
 						params.append(Template(self.bot.language.commands['profile_member']['messages']['name-format']).safe_substitute(name=name))
-					if name:
+					if age and 'age-format' in self.bot.language.commands['profile_member']['messages']:
 						params.append(Template(self.bot.language.commands['profile_member']['messages']['age-format']).safe_substitute(age=age))
-					if isolator_time and isolator_time > 0:
+					if isolator_time and isolator_time > 0 and 'in-isolator-format' in self.bot.language.commands['profile_member']['messages']:
 						params.append(Template(self.bot.language.commands['profile_member']['messages']['in-isolator-format']).safe_substitute(time=relativeTimeParser(seconds=isolator_time,greater=True)))
-					if isolator_end:
+					if isolator_end and 'isolator-ends-format' in self.bot.language.commands['profile_member']['messages']:
 						params.append(Template(self.bot.language.commands['profile_member']['messages']['isolator-ends-format']).safe_substitute(time=isolator_end))
-					field_name = self.bot.language.commands['profile_member']['messages']['personalinfo-field-name']
-					embed.add_field(name = field_name,value='\n'.join(params), inline=False)
+					if params:
+						field_name = self.bot.language.commands['profile_member']['messages']['personalinfo-field-name']
+						embed.add_field(name = field_name,value='\n'.join(params), inline=False)
 
 				if nick:
 					params = []
 					nick = nick.replace('_','\\_')
-					if subname:
+					if subname and 'subname-format' in self.bot.language.commands['profile_member']['messages']:
 						subname = subname.replace('_','\\_')
 						subname = Template(self.bot.language.commands['profile_member']['messages']['subname-format']).safe_substitute(subname=subname)
 					else:
 						subname = ''
-					params.append(Template(self.bot.language.commands['profile_member']['messages']['nick-format']).safe_substitute(nick=nick,subname=subname))
-					if first_join!=last_join:
+					if 'nick-format' in self.bot.language.commands['profile_member']['messages']:
+						params.append(Template(self.bot.language.commands['profile_member']['messages']['nick-format']).safe_substitute(nick=nick,subname=subname))
+					if first_join!=last_join and 'last-join-format' in self.bot.language.commands['profile_member']['messages']:
 						params.append(Template(self.bot.language.commands['profile_member']['messages']['last-join-format']).safe_substitute(time=last_join))
-					params.append(Template(self.bot.language.commands['profile_member']['messages']['first-join-format']).safe_substitute(time=first_join))
-					if time_played > 0:
+					if 'first-join-format' in self.bot.language.commands['profile_member']['messages']:
+						params.append(Template(self.bot.language.commands['profile_member']['messages']['first-join-format']).safe_substitute(time=first_join))
+					if time_played > 0 and 'time-played-format' in self.bot.language.commands['profile_member']['messages']:
 						params.append(Template(self.bot.language.commands['profile_member']['messages']['time-played-format']).safe_substitute(time=relativeTimeParser(seconds=time_played)))
-					if referals_count > 0:
+					if exception_start and 'exception-start-format' in self.bot.language.commands['profile_member']['messages']:
+						params.append(Template(self.bot.language.commands['profile_member']['messages']['exception-start-format']).safe_substitute(time=exception_start))
+					if exception_start and 'exception-end-format' in self.bot.language.commands['profile_member']['messages']:
+						params.append(Template(self.bot.language.commands['profile_member']['messages']['exception-end-format']).safe_substitute(time=exception_end))
+					if referals_count > 0 and 'referals-count-format' in self.bot.language.commands['profile_member']['messages']:
 						referals_word = numberWordFormat(referals_count,[self.bot.language.commands['profile_member']['messages']['referal-word-1'],
 																		self.bot.language.commands['profile_member']['messages']['referal-word-2'],
 																		self.bot.language.commands['profile_member']['messages']['referal-word-3']])
 						params.append(Template(self.bot.language.commands['profile_member']['messages']['referals-count-format']).safe_substitute(referals_count=referals_count,referals_word=referals_word))
-					field_name = self.bot.language.commands['profile_member']['messages']['gameinfo-field-name']
-					embed.add_field(name = field_name,value='\n'.join(params), inline=False)
+					if params:
+						field_name = self.bot.language.commands['profile_member']['messages']['gameinfo-field-name']
+						embed.add_field(name = field_name,value='\n'.join(params), inline=False)
 
 				if premium_end and premium_end > int(datetime.now().timestamp()):
 					params = []
-					params.append(Template(self.bot.language.commands['profile_member']['messages']['premium-given-format']).safe_substitute(time=premium_start))
-					params.append(Template(self.bot.language.commands['profile_member']['messages']['premium-ends-format']).safe_substitute(time=premium_end))
-					field_name = self.bot.language.commands['profile_member']['messages']['premium-field-name']
-					embed.add_field(name = field_name,value='\n'.join(params), inline=False)
+					if 'premium-given-format' in self.bot.language.commands['profile_member']['messages']:
+						params.append(Template(self.bot.language.commands['profile_member']['messages']['premium-given-format']).safe_substitute(time=premium_start))
+					if 'premium-ends-format' in self.bot.language.commands['profile_member']['messages']:
+						params.append(Template(self.bot.language.commands['profile_member']['messages']['premium-ends-format']).safe_substitute(time=premium_end))
+					if params:
+						field_name = self.bot.language.commands['profile_member']['messages']['premium-field-name']
+						embed.add_field(name = field_name,value='\n'.join(params), inline=False)
 
-				if reputation:
+				if reputation and 'reputation-field-name' in self.bot.language.commands['profile_member']['messages']:
 					l = len(reputation)
 					rep = []
 					field_name = self.bot.language.commands['profile_member']['messages']['reputation-field-name']
@@ -242,7 +250,7 @@ class DiscordProfiles:
 				if not discordid:
 					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['profile_nick']['messages']['user-not-found'])
 					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
-				member = self.bot.guild().get_member(discordid)
+				member = self.bot.guild().get_member(discordid[0])
 				if not member:
 					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['profile_nick']['messages']['user-leaved'])
 					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
