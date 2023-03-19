@@ -193,7 +193,7 @@ class DiscordTickets:
 						cursor.execute(f'SELECT channelid, discordid, messageid FROM discord_tickets WHERE discordid=(SELECT discordid FROM discord_tickets WHERE messageid={interaction.message.id} LIMIT 1) AND (closed IS NULL)')
 						values = cursor.fetchall()
 						cursor.execute(f'UPDATE discord_tickets SET closed=UNIX_TIMESTAMP(), channelid=NULL, closer=\'{interaction.user.id}\',receiver=COALESCE(receiver, \'{interaction.user.id}\'), receiver_time=COALESCE(receiver_time, UNIX_TIMESTAMP()) WHERE discordid=\'{values[0][1]}\' AND (closed IS NULL)')
-						cursor.execute(f'INSERT INTO discord_tickets_blocks VALUES(\'{values[0][1]}\',UNIX_TIMESTAMP()+86400) ON DUPLICATE KEY UPDATE time=UNIX_TIMESTAMP()+86400')
+						cursor.execute(f'INSERT INTO discord_tickets_blocks (discordid,time) VALUES(\'{values[0][1]}\',UNIX_TIMESTAMP()+86400) ON DUPLICATE KEY UPDATE time=UNIX_TIMESTAMP()+86400')
 
 					time = int(datetime.now().timestamp())
 					field_name = Template(self.bot.language.commands['ticket_create']['messages']['user-blocked-field-name']).safe_substitute(time=time,user=interaction.user.mention)

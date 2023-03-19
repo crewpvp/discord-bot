@@ -1183,7 +1183,7 @@ class DiscordMinecraft:
 			if reason:
 				cursor.execute(f'INSERT INTO mc_exceptions (id,end,reason) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time},?) ON DUPLICATE KEY UPDATE end=end+{time}, reason=?',(reason,reason,))
 			else:
-				cursor.execute(f'INSERT INTO mc_exceptions (id,end) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time}) ON DUPLICATE KEY UPDATE isolated=TRUE, end=end+{time})')
+				cursor.execute(f'INSERT INTO mc_exceptions (id,end) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time}) ON DUPLICATE KEY UPDATE end=end+{time}')
 			if(member:=self.bot.guild().get_member(data[0])):
 				await member.add_roles(self.bot.guild().get_role(self.exception_role))
 				return member
