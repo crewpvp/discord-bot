@@ -168,7 +168,7 @@ class DiscordTickets:
 						if (channel:=interaction.guild.get_channel(values[0])):
 							thread_name = self.bot.language.commands['ticket_create']['messages']['ticket-history-thread-name']
 							thread = await interaction.message.create_thread(name=thread_name)
-							author = None
+							authors = {}
 							skip_first = True
 							async for message in channel.history(limit=None,oldest_first=True):
 								if skip_first:
@@ -176,13 +176,13 @@ class DiscordTickets:
 									continue
 								if message.content or message.embeds or message.attachments:
 									files = [discord.File(BytesIO(await attachment.read(use_cached=False)),filename=attachment.filename) for attachment in message.attachments]
-									if author != message.author:
-										author = message.author
-										await thread.send(content=f'{message.author.mention} <t:{int(message.created_at.timestamp())}:R>:\n{message.content}',embeds=message.embeds,files=files)
-									else:
-										await thread.send(content=message.content,embeds=message.embeds,files=files)
+									if message.author.id not in authors:
+										authors[message.author.id] = await interaction.message.channel.create_webhook(name=str(message.author),avatar=(await message.author.avatar.read() if message.author.avatar else None))
+									await authors[message.author.id].send(wait=False,content=message.content,embeds=message.embeds,files=files,thread=thread)
 							await thread.edit(archived=True, locked=True, pinned=False)
 							await channel.delete()
+							for webhook in authors.values():
+								await webhook.delete()
 					
 				elif customid == 'ticket_block':
 					if not bool(set(role.id for role in interaction.user.roles) & set(self.answer_roles)):
@@ -204,6 +204,7 @@ class DiscordTickets:
 					await interaction.response.edit_message(view=None,embed=embed)
 
 					thread_name = self.bot.language.commands['ticket_create']['messages']['ticket-history-thread-name']
+					authors = {}
 					for channelid, discordid, messageid in values:
 						if (message:=await interaction.channel.fetch_message(messageid)):
 							if message.id != interaction.message.id:
@@ -213,7 +214,6 @@ class DiscordTickets:
 						if (channel:=interaction.guild.get_channel(channelid)):
 							if message:
 								thread = await message.create_thread(name=thread_name)
-								author = None
 								skip_first = True
 								async for message in channel.history(limit=None,oldest_first=True):
 									if skip_first:
@@ -221,13 +221,13 @@ class DiscordTickets:
 										continue
 									if message.content or message.embeds or message.attachments:
 										files = [discord.File(BytesIO(await attachment.read(use_cached=False)),filename=attachment.filename) for attachment in message.attachments]
-										if author != message.author:
-											author = message.author
-											await thread.send(content=f'{message.author.mention} <t:{int(message.created_at.timestamp())}:R>:\n{message.content}',embeds=message.embeds,files=files)
-										else:
-											await thread.send(content=message.content,embeds=message.embeds,files=files)
+										if message.author.id not in authors:
+											authors[message.author.id] = await interaction.message.channel.create_webhook(name=str(message.author),avatar=(await message.author.avatar.read() if message.author.avatar else None))
+										await authors[message.author.id].send(wait=False,content=message.content,embeds=message.embeds,files=files,thread=thread)
 								await thread.edit(archived=True, locked=True, pinned=False)
 							await channel.delete()
+					for webhook in authors.values():
+						await webhook.delete()
 				elif customid == 'ticket_accept':
 					if not bool(set(role.id for role in interaction.user.roles) & set(self.answer_roles)):
 						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['ticket_create']['messages']['no-ticket-permission'])
