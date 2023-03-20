@@ -6,7 +6,7 @@ from modules.utils import relativeTimeParser
 import random
 from string import Template
 from manager import DiscordManager
-
+from language import DiscordLanguage
 class DiscordMutes:
 	def __init__(self, bot, muted_role: int, check_every_seconds: int, images: [str,...] = []):
 		self.bot = bot
@@ -17,12 +17,8 @@ class DiscordMutes:
 		with self.bot.cursor() as cursor:
 			cursor.execute("CREATE TABLE IF NOT EXISTS discord_isolator (discordid BIGINT NOT NULL, start INT(11) DEFAULT UNIX_TIMESTAMP(), end INT(11), isolated BOOL NOT NULL, time INT(11) NOT NULL DEFAULT 0, reason TEXT, CONSTRAINT PRIMARY KEY(discordid))")
 		
-		command_init = self.bot.language.commands['mute']['init']
-		@command_init.command(**self.bot.language.commands['mute']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['mute']['choices'])
-		@app_commands.describe(**self.bot.language.commands['mute']['describe'])
-		@app_commands.rename(**self.bot.language.commands['mute']['rename'])
-		async def command_mute(interaction: discord.Interaction, member: discord.Member, days: float = 1.0, reason: str = None):
+		@DiscordLanguage.command
+		async def mute(interaction: discord.Interaction, member: discord.Member, days: float = 1.0, reason: str = None):
 			await self.mute(member,reason,days=days)
 			reason = Template(self.bot.language.commands['mute']['messages']['reason']).safe_substitute(reason=reason) if reason else ''
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['mute']['messages']['user-muted']).safe_substitute(reason=reason,user=member.mention,time=relativeTimeParser(days=days)))
@@ -30,11 +26,8 @@ class DiscordMutes:
 				embeds[0].set_image(url=random.choice(self.images))
 			await interaction.response.send_message(content=content,embeds=embeds)
 
-		command_init = self.bot.language.commands['unmute']['init']
-		@command_init.command(**self.bot.language.commands['unmute']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['unmute']['describe'])
-		@app_commands.rename(**self.bot.language.commands['unmute']['rename'])
-		async def command_unmute(interaction: discord.Interaction, member: discord.Member):
+		@DiscordLanguage.command
+		async def unmute(interaction: discord.Interaction, member: discord.Member):
 			if await self.unmute(member):
 				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['unmute']['messages']['user-unmuted']).safe_substitute(user=member.mention))
 				await interaction.response.send_message(content=content,embeds=embeds)
@@ -42,11 +35,8 @@ class DiscordMutes:
 				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['unmute']['messages']['user-not-muted']).safe_substitute(user=member.mention))
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				
-		command_init = self.bot.language.commands['isolator']['init']
-		@command_init.command(**self.bot.language.commands['isolator']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['isolator']['describe'])
-		@app_commands.rename(**self.bot.language.commands['isolator']['rename'])
-		async def command_isolator(interaction: discord.Interaction, page: int = None):
+		@DiscordLanguage.command
+		async def isolator(interaction: discord.Interaction, page: int = None):
 			page = 0 if not page or page < 1 else page-1
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT discordid,end,reason FROM discord_isolator WHERE isolated=TRUE ORDER BY start DESC LIMIT {page*5},5 ')

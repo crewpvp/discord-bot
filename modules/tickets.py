@@ -5,7 +5,7 @@ from modules.utils import relativeTimeParser
 from manager import DiscordManager
 from string import Template
 from io import BytesIO
-
+from language import DiscordLanguage
 class DiscordTickets:
 	def __init__(self, bot,channel: int, category: int,check_every_seconds: int, answer_roles: [int,...] = [], max_opened_per_user: int = 5):
 		self.bot = bot
@@ -19,12 +19,8 @@ class DiscordTickets:
 			cursor.execute("CREATE TABLE IF NOT EXISTS discord_tickets (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL, time INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(),messageid BIGINT, channelid BIGINT, receiver BIGINT, closer BIGINT, receiver_time INT(11), closed INT(11), PRIMARY KEY(id))")
 			cursor.execute("CREATE TABLE IF NOT EXISTS discord_tickets_blocks (discordid BIGINT NOT NULL, time INT(11) NOT NULL, PRIMARY KEY(discordid))")
 
-		command_init = self.bot.language.commands['ticket_button']['init']
-		@command_init.command(**self.bot.language.commands['ticket_button']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['ticket_button']['choices'])
-		@app_commands.describe(**self.bot.language.commands['ticket_button']['describe'])
-		@app_commands.rename(**self.bot.language.commands['ticket_button']['rename'])
-		async def command_ticket_button(interaction: discord.Interaction, label: str = None, color: app_commands.Choice[int] = None):
+		@DiscordLanguage.command
+		async def ticket_button(interaction: discord.Interaction, label: str = None, color: app_commands.Choice[int] = None):
 			label = label[:80] if label else self.bot.language.commands['ticket_button']['messages']['default-button-text']
 			color = discord.ButtonStyle(color.value) if color else discord.ButtonStyle(2)
 			view = discord.ui.View(timeout=None)
@@ -33,9 +29,8 @@ class DiscordTickets:
 			content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['ticket_button']['messages']['button-created'])
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 		
-		command_init = self.bot.language.commands['ticket_active']['init']
-		@command_init.command(**self.bot.language.commands['ticket_active']['initargs'])
-		async def command_ticket_active(interaction: discord.Interaction):
+		@DiscordLanguage.command
+		async def ticket_active(interaction: discord.Interaction):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id, messageid, channelid FROM discord_tickets WHERE closed IS NULL ORDER BY id')
 				tickets = cursor.fetchall()
@@ -54,11 +49,8 @@ class DiscordTickets:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['ticket_active']['messages']['no-active-tickets'])
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		command_init = self.bot.language.commands['ticket_pardon']['init']
-		@command_init.command(**self.bot.language.commands['ticket_pardon']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['ticket_pardon']['describe'])
-		@app_commands.rename(**self.bot.language.commands['ticket_pardon']['rename'])
-		async def command_ticket_pardon(interaction: discord.Interaction, member: discord.Member):
+		@DiscordLanguage.command
+		async def ticket_pardon(interaction: discord.Interaction, member: discord.Member):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT discordid FROM discord_tickets_blocks WHERE discordid={member.id}')
 				if cursor.fetchone():
@@ -68,11 +60,8 @@ class DiscordTickets:
 					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['ticket_pardon']['messages']['user-not-banned'])
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 		
-		command_init = self.bot.language.commands['ticket_create']['init']
-		@command_init.command(**self.bot.language.commands['ticket_create']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['ticket_create']['describe'])
-		@app_commands.rename(**self.bot.language.commands['ticket_create']['rename'])
-		async def command_ticket_create(interaction: discord.Interaction, text: str):
+		@DiscordLanguage.command
+		async def ticket_create(interaction: discord.Interaction, text: str):
 			cursor = self.bot.cursor()
 			cursor.execute(f'SELECT COUNT(*) FROM discord_tickets WHERE discordid={interaction.user.id} AND (closed IS NULL)')
 			count = cursor.fetchone()[0]

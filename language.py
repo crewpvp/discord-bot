@@ -1,12 +1,17 @@
 from discord import app_commands
 
 class DiscordLanguage():
+	instance = None
+    
+
 	def __init__(self,bot,language):
 		self.bot = bot
 		self.language = language
 		self.messages = language['messages'] if 'messages' in language else {}
 		self.create_groups()
 		self.create_commands()
+		DiscordLanguage.instance = self
+
 	def create_groups(self):
 		self.groups = {}
 		if 'command_groups' in self.language:
@@ -14,7 +19,18 @@ class DiscordLanguage():
 			for group_name in command_groups.keys():
 				group_description = command_groups[group_name]
 				self.groups[group_name] = app_commands.Group(name=group_name, description=group_description) 
-	
+	@staticmethod
+	def command(func):
+		command = DiscordLanguage.instance.commands[func.__name__]
+		return command['init'].command(**command['initargs'])(
+			app_commands.describe(**command['describe'])(
+				app_commands.rename(**command['rename'])(
+					app_commands.choices(**command['choices'])(
+						func)
+					)
+				)
+			)
+
 	def register_groups(self):
 		guild = self.bot.guild_object()
 		for group in self.groups.values():

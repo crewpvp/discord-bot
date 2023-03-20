@@ -4,18 +4,15 @@ import discord
 from string import Template
 from language import DiscordLanguage
 from manager import DiscordManager
-
+from language import DiscordLanguage
 class DiscordNickColor:
 	def __init__(self, bot, colors: [[str,int],...]):
 		self.bot = bot
 		self.colors = colors
 
-		command_init = self.bot.language.commands['nickcolor']['init']
-		@command_init.command(**self.bot.language.commands['nickcolor']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['nickcolor']['describe'])
-		@app_commands.rename(**self.bot.language.commands['nickcolor']['rename'])
+		@DiscordLanguage.command
 		@app_commands.choices(color=[app_commands.Choice(name=colors[i][0].lower(), value=i) for i in range(len(colors))])
-		async def command_nickcolor(interaction: discord.Interaction, color: app_commands.Choice[int] = None):
+		async def nickcolor(interaction: discord.Interaction, color: app_commands.Choice[int] = None):
 			guild = interaction.guild
 			roles = tuple(set(guild.get_role(col[1]) for col in self.colors) & set(interaction.user.roles))
 			if color==None:

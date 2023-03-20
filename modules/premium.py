@@ -4,6 +4,7 @@ import discord
 from string import Template
 from modules.utils import relativeTimeParser
 from manager import DiscordManager
+from language import DiscordLanguage
 
 class DiscordPremium:
 	def __init__(self, bot, premium_role: int, check_every_seconds: int):
@@ -14,27 +15,20 @@ class DiscordPremium:
 		with self.bot.cursor() as cursor:
 			cursor.execute("CREATE TABLE IF NOT EXISTS discord_premium (discordid BIGINT NOT NULL, start INT(11), end INT(11), PRIMARY KEY(discordid))")
 
-		command_init = self.bot.language.commands['premium_give']['init']
-		@command_init.command(**self.bot.language.commands['premium_give']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['premium_give']['choices'])
-		@app_commands.describe(**self.bot.language.commands['premium_give']['describe'])
-		@app_commands.rename(**self.bot.language.commands['premium_give']['rename'])
-		async def command_premium_give(interaction: discord.Interaction, member: discord.Member, days: float = 1.0, reason: str = None):
+		@DiscordLanguage.command
+		async def premium_give(interaction: discord.Interaction, member: discord.Member, days: float = 1.0, reason: str = None):
 			reason = Template(self.bot.language.commands['premium_give']['messages']['reason']).safe_substitute(reason=reason) if reason else ''
 			await self.add_premium(member=member,days=days)
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['premium_give']['messages']['premium-given']).safe_substitute(user=member.mention,time=relativeTimeParser(days=days),reason=reason))
 			await interaction.response.send_message(content=content,embeds=embeds,ephemeral=False)
 		
 		for key in self.bot.language.commands['premium_give']['autocomplete']:
-			@command_premium_give.autocomplete(key)
+			@premium_give.autocomplete(key)
 			async def autocomplete(interaction: discord.Interaction, current: str,) -> [app_commands.Choice[str]]:
 				return self.bot.language.commands['premium_give']['autocomplete'][key](interaction,current)
 
-		command_init = self.bot.language.commands['premium_remove']['init']
-		@command_init.command(**self.bot.language.commands['premium_remove']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['premium_remove']['describe'])
-		@app_commands.rename(**self.bot.language.commands['premium_remove']['rename'])
-		async def command_premium_remove(interaction: discord.Interaction, member: discord.Member):
+		@DiscordLanguage.command
+		async def premium_remove(interaction: discord.Interaction, member: discord.Member):
 			if not await self.remove_premium(member):
 				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['premium_remove']['messages']['premium-not-found']).safe_substitute(user=member.mention))
 			else:

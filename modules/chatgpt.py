@@ -4,7 +4,7 @@ from revChatGPT.V1 import Chatbot
 import asyncio, functools, typing
 from datetime import datetime
 from manager import DiscordManager
-
+from language import DiscordLanguage
 def to_thread(func: typing.Callable) -> typing.Coroutine:
 	@functools.wraps(func)
 	async def wrapper(*args, **kwargs):
@@ -92,9 +92,8 @@ class DiscordChatGPT:
 
 		self.message = message
 
-		command_init = self.bot.language.commands['chatgpt_updateconversation']['init']
-		@command_init.command(**self.bot.language.commands['chatgpt_updateconversation']['initargs'])
-		async def command_chatgpt_updateconversation(interaction: discord.Interaction):
+		@DiscordLanguage.command
+		async def chatgpt_updateconversation(interaction: discord.Interaction):
 			await interaction.response.defer(ephemeral=True)
 			try:
 				await self.create_conversation()

@@ -4,6 +4,7 @@ import discord
 from datetime import datetime
 from string import Template
 from manager import DiscordManager
+from language import DiscordLanguage
 
 class DiscordVotes:
 	def __init__(self, bot, vote_roles: [int,...],check_every_seconds: int):
@@ -15,12 +16,8 @@ class DiscordVotes:
 			cursor.execute("CREATE TABLE IF NOT EXISTS discord_votes_values (id BIGINT NOT NULL, value INT NOT NULL, label CHAR(100) NOT NULL, description CHAR(100), FOREIGN KEY(id) REFERENCES discord_votes(id) ON DELETE CASCADE)")
 			cursor.execute("CREATE TABLE IF NOT EXISTS discord_votes_answers (id BIGINT NOT NULL, discordid BIGINT NOT NULL, value INT NOT NULL, FOREIGN KEY(id) REFERENCES discord_votes(id) ON DELETE CASCADE)")
 		
-		command_init = self.bot.language.commands['vote']['init']
-		@command_init.command(**self.bot.language.commands['vote']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['vote']['choices'])
-		@app_commands.describe(**self.bot.language.commands['vote']['describe'])
-		@app_commands.rename(**self.bot.language.commands['vote']['rename'])
-		async def command_vote(interaction: discord.Interaction,values: str, min: int = 1, max: int = 1, hours: float = 0.5, placeholder: str = None):
+		@DiscordLanguage.command
+		async def vote(interaction: discord.Interaction,values: str, min: int = 1, max: int = 1, hours: float = 0.5, placeholder: str = None):
 			values = values.replace("\\","/")
 			if placeholder and len(placeholder) > 150:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['vote']['messages']['placeholder-length-error'])

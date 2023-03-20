@@ -2,16 +2,13 @@ from discord import app_commands
 import discord
 import json
 import re
+from language import DiscordLanguage
 class DiscordManager():
 	def __init__(self,bot):
 		self.bot = bot
 		
-		command_init = self.bot.language.commands['message_sendraw']['init']
-		@command_init.command(**self.bot.language.commands['message_sendraw']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['message_sendraw']['choices'])
-		@app_commands.describe(**self.bot.language.commands['message_sendraw']['describe'])
-		@app_commands.rename(**self.bot.language.commands['message_sendraw']['rename'])
-		async def command_message_rawsend(interaction: discord.Interaction, content: str):
+		@DiscordLanguage.command
+		async def message_sendraw(interaction: discord.Interaction, content: str):
 			try:
 				content, reference, embeds, components = DiscordManager.json_to_message(content)
 				message = await interaction.channel.send(content=content, reference=reference, embeds = embeds, view=components)
@@ -20,11 +17,8 @@ class DiscordManager():
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['message_sendraw']['messages']['parse-error'])
 			await interaction.response.send_message(content=content,embeds=embeds,ephemeral=True)
 		
-		command_init = self.bot.language.commands['message_raw']['init']
-		@command_init.command(**self.bot.language.commands['message_raw']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['message_raw']['describe'])
-		@app_commands.rename(**self.bot.language.commands['message_raw']['rename'])
-		async def command_message_raw(interaction: discord.Interaction,id: str):
+		@DiscordLanguage.command
+		async def message_raw(interaction: discord.Interaction,id: str):
 			if not re.match('[0-9]*',id) is not None:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['message_raw']['messages']['incorrect-id-error'])
 				await interaction.response.send_message(content=content,embeds=embeds,ephemeral=True)
@@ -37,9 +31,10 @@ class DiscordManager():
 				return
 			embed = discord.Embed(description = f'```json\n{DiscordManager.message_to_json(message)}```',colour = discord.Colour.green())	
 			await interaction.response.send_message(embed=embed,ephemeral=True)
+		
 		@self.bot.tree.context_menu(name = self.bot.language.commands['message_raw']['messages']['context'], guild = self.bot.guild_object())
 		async def context_message_raw(interaction: discord.Interaction, message: discord.Message):
-			await command_message_raw.callback(interaction,str(message.id))
+			await message_raw.callback(interaction,str(message.id))
 	@staticmethod
 	def message_to_json(message):
 		msg = {}

@@ -5,6 +5,7 @@ from datetime import datetime
 from modules.utils import numberWordFormat
 from string import Template
 from manager import DiscordManager
+from language import DiscordLanguage
 
 class DiscordProfiles:
 	def __init__(self, bot, reputation_enums:[[str,bool],...]):
@@ -15,11 +16,8 @@ class DiscordProfiles:
 			cursor.execute("CREATE TABLE IF NOT EXISTS discord_profiles (discordid BIGINT NOT NULL, name VARCHAR(32), age INT(2), iswoman BOOL, PRIMARY KEY(discordid))")
 			cursor.execute("CREATE TABLE IF NOT EXISTS discord_reputation (user BIGINT NOT NULL, rater BIGINT NOT NULL, val INT NOT NULL, PRIMARY KEY(user, rater))")
 		
-		command_init = self.bot.language.commands['profile_age']['init']
-		@command_init.command(**self.bot.language.commands['profile_age']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['profile_age']['describe'])
-		@app_commands.rename(**self.bot.language.commands['profile_age']['rename'])
-		async def command_profile_age(interaction: discord.Interaction, age: int = None):
+		@DiscordLanguage.command
+		async def profile_age(interaction: discord.Interaction, age: int = None):
 			if age == None:
 				with self.bot.cursor() as cursor:
 					cursor.execute(f'INSERT INTO discord_profiles (discordid, age) VALUES (\'{interaction.user.id}\',NULL) ON DUPLICATE KEY UPDATE age=NULL')
@@ -33,11 +31,8 @@ class DiscordProfiles:
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['profile_age']['messages']['age-changed']).safe_substitute(age=age))
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 		
-		command_init = self.bot.language.commands['profile_name']['init']
-		@command_init.command(**self.bot.language.commands['profile_name']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['profile_name']['describe'])
-		@app_commands.rename(**self.bot.language.commands['profile_name']['rename'])
-		async def command_profile_name(interaction: discord.Interaction, name: str = None):
+		@DiscordLanguage.command
+		async def profile_name(interaction: discord.Interaction, name: str = None):
 			if name == None:
 				with self.bot.cursor() as cursor:
 					cursor.execute(f'INSERT INTO discord_profiles (discordid, name) VALUES (\'{interaction.user.id}\',NULL) ON DUPLICATE KEY UPDATE name=NULL')
@@ -63,12 +58,8 @@ class DiscordProfiles:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['profile_name']['messages']['incorrect-symbols-error'])
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				
-		command_init = self.bot.language.commands['profile_gender']['init']
-		@command_init.command(**self.bot.language.commands['profile_gender']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['profile_gender']['choices'])
-		@app_commands.describe(**self.bot.language.commands['profile_gender']['describe'])
-		@app_commands.rename(**self.bot.language.commands['profile_gender']['rename'])
-		async def command_profile_gender(interaction: discord.Interaction, gender: app_commands.Choice[int] = None):
+		@DiscordLanguage.command
+		async def profile_gender(interaction: discord.Interaction, gender: app_commands.Choice[int] = None):
 			if gender == None:
 				with self.bot.cursor() as cursor:
 					cursor.execute(f'INSERT INTO discord_profiles (discordid, iswoman) VALUES (\'{interaction.user.id}\',NULL) ON DUPLICATE KEY UPDATE iswoman=NULL')
@@ -80,12 +71,9 @@ class DiscordProfiles:
 				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['profile_gender']['messages']['gender-changed']).safe_substitute(gender=gender.name))
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 		
-		command_init = self.bot.language.commands['profile_reputation']['init']
-		@command_init.command(**self.bot.language.commands['profile_reputation']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['profile_reputation']['describe'])
-		@app_commands.rename(**self.bot.language.commands['profile_reputation']['rename'])
+		@DiscordLanguage.command
 		@app_commands.choices(enum=[app_commands.Choice(name=self.reputation_enums[i][0].lower(), value=i) for i in range(len(self.reputation_enums))])
-		async def command_profile_reputation(interaction: discord.Interaction,  member: discord.Member, enum: app_commands.Choice[int] = None):
+		async def profile_reputation(interaction: discord.Interaction,  member: discord.Member, enum: app_commands.Choice[int] = None):
 			if member == interaction.user:
 				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['profile_reputation']['messages']['self-reputation-error']).safe_substitute(user=member.mention))
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
@@ -105,12 +93,8 @@ class DiscordProfiles:
 				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['profile_reputation']['messages']['nagative-reputation']).safe_substitute(user=member.mention,reputation=self.reputation_enums[enum.value][0]))
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
 
-		command_init = self.bot.language.commands['profile_member']['init']
-		@command_init.command(**self.bot.language.commands['profile_member']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['profile_member']['choices'])
-		@app_commands.describe(**self.bot.language.commands['profile_member']['describe'])
-		@app_commands.rename(**self.bot.language.commands['profile_member']['rename'])
-		async def command_profile_member(interaction: discord.Interaction, member: discord.Member, hide: app_commands.Choice[int] = None):
+		@DiscordLanguage.command
+		async def profile_member(interaction: discord.Interaction, member: discord.Member, hide: app_commands.Choice[int] = None):
 			hide = True if (hide==None or hide.value==1) else False
 			name,age,iswoman,premium_start, premium_end, nick, first_join, last_join, time_played,isolator_end,isolator_time,exception_end, exception_start = None, None, None, None, None, None, None, None, None, None, None, None, None
 			
@@ -236,13 +220,9 @@ class DiscordProfiles:
 					choices = list(cursor.fetchall())
 				return [ app_commands.Choice(name=choice[0], value=choice[0]) for choice in choices if current.lower() in choice[0].lower()]
 			
-			command_init = self.bot.language.commands['profile_nick']['init']
-			@command_init.command(**self.bot.language.commands['profile_nick']['initargs'])
-			@app_commands.choices(**self.bot.language.commands['profile_nick']['choices'])
-			@app_commands.describe(**self.bot.language.commands['profile_nick']['describe'])
-			@app_commands.rename(**self.bot.language.commands['profile_nick']['rename'])	
+			@DiscordLanguage.command
 			@app_commands.autocomplete(nickname=nickAutocomplete)
-			async def command_profile_nick(interaction: discord.Interaction, nickname: str, hide: app_commands.Choice[int] = None):
+			async def profile_nick(interaction: discord.Interaction, nickname: str, hide: app_commands.Choice[int] = None):
 				dotnickname = nickname[1:] if nickname.startswith('.') else '.'+nickname
 				with self.bot.cursor() as cursor:
 					cursor.execute(f'SELECT discordid FROM mc_accounts WHERE LOWER(nick) LIKE LOWER(\'{nickname}\') OR LOWER(nick) LIKE LOWER(\'{dotnickname}\') LIMIT 1')
@@ -254,13 +234,9 @@ class DiscordProfiles:
 				if not member:
 					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['profile_nick']['messages']['user-leaved'])
 					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
-				await command_profile_member.callback(interaction,member,hide)
+				await profile_member.callback(interaction,member,hide)
 					
 		
-		command_init = self.bot.language.commands['profile_me']['init']
-		@command_init.command(**self.bot.language.commands['profile_me']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['profile_me']['choices'])
-		@app_commands.describe(**self.bot.language.commands['profile_me']['describe'])
-		@app_commands.rename(**self.bot.language.commands['profile_me']['rename'])	
-		async def command_profile_me(interaction: discord.Interaction,  hide: app_commands.Choice[int] = None):
-			await command_profile_member.callback(interaction, interaction.user, hide)
+		@DiscordLanguage.command	
+		async def profile_me(interaction: discord.Interaction,  hide: app_commands.Choice[int] = None):
+			await profile_member.callback(interaction, interaction.user, hide)

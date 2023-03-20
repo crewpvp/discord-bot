@@ -6,6 +6,7 @@ from manager import DiscordManager
 from modules.MinecraftWebAPI import MinecraftWebAPI
 from string import Template
 from manager import DiscordManager
+from language import DiscordLanguage
 
 class DiscordMinecraft:
 	def __init__(self, bot, category: int, channel: int, cooldown: int, registered_role: int,approved_time:int, disapproved_time: int,request_duration: int,exception_role: int,inactive_role: int, inactive_time: int,inactive_on_leave:bool,counter_enabled: bool, counter_format:str, counter_channels:int, check_every_seconds: int, web_host: str, web_login: str, web_password: str):
@@ -44,12 +45,8 @@ class DiscordMinecraft:
 			
 			cursor.execute("CREATE TABLE IF NOT EXISTS LinkedPlayers (bedrockId BINARY(16) NOT NULL ,javaUniqueId BINARY(16) NOT NULL ,javaUsername VARCHAR(16) NOT NULL, bedrockUsername VARCHAR(17), PRIMARY KEY (bedrockId) , INDEX (bedrockId, javaUniqueId)) ENGINE = InnoDB")
 		
-		command_init = self.bot.language.commands['registration_startbuttons']['init']
-		@command_init.command(**self.bot.language.commands['registration_startbuttons']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['registration_startbuttons']['choices'])
-		@app_commands.describe(**self.bot.language.commands['registration_startbuttons']['describe'])
-		@app_commands.rename(**self.bot.language.commands['registration_startbuttons']['rename'])
-		async def command_registration_startbuttons(interaction: discord.Interaction, java_label: str = None, java_color: app_commands.Choice[int] = None,bedrock_label: str = None, bedrock_color: app_commands.Choice[int] = None):
+		@DiscordLanguage.command
+		async def registration_startbuttons(interaction: discord.Interaction, java_label: str = None, java_color: app_commands.Choice[int] = None,bedrock_label: str = None, bedrock_color: app_commands.Choice[int] = None):
 			java_label = java_label[:80] if java_label else self.bot.language.commands['registration_startbuttons']['messages']['default-java-text']
 			bedrock_label = bedrock_label[:80] if bedrock_label else self.bot.language.commands['registration_startbuttons']['messages']['default-bedrock-text']
 			java_color = discord.ButtonStyle(java_color.value) if java_color else discord.ButtonStyle(2)
@@ -61,12 +58,8 @@ class DiscordMinecraft:
 			content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['registration_startbuttons']['messages']['buttons-created'])
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		command_init = self.bot.language.commands['registration_recoverybutton']['init']
-		@command_init.command(**self.bot.language.commands['registration_recoverybutton']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['registration_recoverybutton']['choices'])
-		@app_commands.describe(**self.bot.language.commands['registration_recoverybutton']['describe'])
-		@app_commands.rename(**self.bot.language.commands['registration_recoverybutton']['rename'])
-		async def command_registration_recoverybutton(interaction: discord.Interaction, label: str = None, color: app_commands.Choice[int] = None):
+		@DiscordLanguage.command
+		async def registration_recoverybutton(interaction: discord.Interaction, label: str = None, color: app_commands.Choice[int] = None):
 			label = label[:80] if label else self.bot.language.commands['registration_recoverybutton']['messages']['default-button-text']
 			color = discord.ButtonStyle(color.value) if color else discord.ButtonStyle(2)
 			view = discord.ui.View(timeout=None)
@@ -75,9 +68,8 @@ class DiscordMinecraft:
 			content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['registration_recoverybutton']['messages']['button-created'])
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		command_init = self.bot.language.commands['recovery']['init']
-		@command_init.command(**self.bot.language.commands['recovery']['initargs'])
-		async def command_recovery(interaction: discord.Interaction):
+		@DiscordLanguage.command
+		async def recovery(interaction: discord.Interaction):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id FROM mc_accounts WHERE discordid={interaction.user.id} AND inactive=TRUE')
 				if not cursor.fetchone():
@@ -91,9 +83,8 @@ class DiscordMinecraft:
 					return
 				await interaction.response.send_modal(self.recovery_modal())
 					
-		command_init = self.bot.language.commands['authorize']['init']
-		@command_init.command(**self.bot.language.commands['authorize']['initargs'])
-		async def command_authorize(interaction: discord.Interaction):
+		@DiscordLanguage.command
+		async def authorize(interaction: discord.Interaction):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={interaction.user.id}')
 				data = cursor.fetchone()
@@ -110,9 +101,8 @@ class DiscordMinecraft:
 			content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['authorize']['messages']['authorized'])
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 		
-		command_init = self.bot.language.commands['logout']['init']
-		@command_init.command(**self.bot.language.commands['logout']['initargs'])
-		async def command_logout(interaction: discord.Interaction):
+		@DiscordLanguage.command
+		async def logout(interaction: discord.Interaction):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id,nick,ip FROM mc_accounts WHERE discordid={interaction.user.id}')
 				data = cursor.fetchone()
@@ -131,11 +121,8 @@ class DiscordMinecraft:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['logout']['messages']['unlogon'])
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		command_init = self.bot.language.commands['authcode']['init']
-		@command_init.command(**self.bot.language.commands['authcode']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['authcode']['describe'])
-		@app_commands.rename(**self.bot.language.commands['authcode']['rename'])
-		async def command_authcode(interaction: discord.Interaction, minutes: int = 60):
+		@DiscordLanguage.command
+		async def authcode(interaction: discord.Interaction, minutes: int = 60):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={interaction.user.id}')
 				data = cursor.fetchone()
@@ -150,12 +137,8 @@ class DiscordMinecraft:
 				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['authcode']['messages']['code-sended']).safe_substitute(time=code_time,code=code))
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		command_init = self.bot.language.commands['register']['init']
-		@command_init.command(**self.bot.language.commands['register']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['register']['choices'])
-		@app_commands.describe(**self.bot.language.commands['register']['describe'])
-		@app_commands.rename(**self.bot.language.commands['register']['rename'])
-		async def command_register(interaction: discord.Interaction, environment: app_commands.Choice[int], nick:str, referal: str = None):
+		@DiscordLanguage.command
+		async def register(interaction: discord.Interaction, environment: app_commands.Choice[int], nick:str, referal: str = None):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id FROM mc_accounts WHERE discordid={interaction.user.id}')
 				if cursor.fetchone():
@@ -237,11 +220,8 @@ class DiscordMinecraft:
 				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['registration-started']).safe_substitute(channel_name=channel_name,channel_link=channel_link))
 				await interaction.response.send_message(content = content, embeds = embeds, ephemeral=True)
 
-		command_init = self.bot.language.commands['link']['init']
-		@command_init.command(**self.bot.language.commands['link']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['link']['describe'])
-		@app_commands.rename(**self.bot.language.commands['link']['rename'])
-		async def command_link(interaction: discord.Interaction, nick: str):
+		@DiscordLanguage.command
+		async def link(interaction: discord.Interaction, nick: str):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={interaction.user.id}')
 				data = cursor.fetchone()
@@ -308,11 +288,8 @@ class DiscordMinecraft:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['link']['messages']['account-linked'])
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		command_init = self.bot.language.commands['unlink']['init']
-		@command_init.command(**self.bot.language.commands['unlink']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['unlink']['describe'])
-		@app_commands.rename(**self.bot.language.commands['unlink']['rename'])
-		async def command_unlink(interaction: discord.Interaction, environment: app_commands.Choice[int] = None):
+		@DiscordLanguage.command
+		async def unlink(interaction: discord.Interaction, environment: app_commands.Choice[int] = None):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT bedrockId,javaUniqueId,javaUsername,bedrockUsername FROM LinkedPlayers WHERE javaUniqueId = (SELECT UNHEX(REPLACE(id, \'-\', \'\')) FROM mc_accounts WHERE discordid = {interaction.user.id} LIMIT 1)')
 				data = cursor.fetchone()
@@ -347,11 +324,8 @@ class DiscordMinecraft:
 					else:
 						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
-		command_init = self.bot.language.commands['shizotop']['init']
-		@command_init.command(**self.bot.language.commands['shizotop']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['shizotop']['describe'])
-		@app_commands.rename(**self.bot.language.commands['shizotop']['rename'])
-		async def command_shizotop(interaction: discord.Interaction, page: int = 1):
+		@DiscordLanguage.command
+		async def shizotop(interaction: discord.Interaction, page: int = 1):
 			page = 0 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT nick,discordid,time_played FROM mc_accounts ORDER BY time_played DESC LIMIT {page*25},25')
@@ -374,12 +348,8 @@ class DiscordMinecraft:
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['shizotop']['messages']['shizo-list']).safe_substitute(players=l))
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
 		
-		command_init = self.bot.language.commands['exception_nick']['init']
-		@command_init.command(**self.bot.language.commands['exception_nick']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['exception_nick']['choices'])
-		@app_commands.describe(**self.bot.language.commands['exception_nick']['describe'])
-		@app_commands.rename(**self.bot.language.commands['exception_nick']['rename'])
-		async def command_exception_nick(interaction: discord.Interaction, nick: str, days: float = 1.0, reason: str = None):
+		@DiscordLanguage.command
+		async def exception_nick(interaction: discord.Interaction, nick: str, days: float = 1.0, reason: str = None):
 			user = await self.add_exception(nick=nick,reason=reason,days=days)
 			if not user:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['exception_nick']['messages']['account-not-found'])
@@ -390,12 +360,8 @@ class DiscordMinecraft:
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['exception_nick']['messages']['player-exceptioned']).safe_substitute(user=user,nick=nick,reason=reason,time=relativeTimeParser(days=days)))
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
 				
-		command_init = self.bot.language.commands['exception_member']['init']
-		@command_init.command(**self.bot.language.commands['exception_member']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['exception_member']['choices'])
-		@app_commands.describe(**self.bot.language.commands['exception_member']['describe'])
-		@app_commands.rename(**self.bot.language.commands['exception_member']['rename'])
-		async def command_exception_member(interaction: discord.Interaction, member: discord.Member, days: float = 1.0, reason: str = None):
+		@DiscordLanguage.command
+		async def exception_member(interaction: discord.Interaction, member: discord.Member, days: float = 1.0, reason: str = None):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT nick FROM mc_accounts WHERE discordid={member.id}')
 				data=cursor.fetchone()
@@ -403,14 +369,10 @@ class DiscordMinecraft:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['exception_member']['messages']['account-not-found'])
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				return
-			await command_exception_nick.callback(interaction=interaction,nick=data[0],days=days,reason=reason)
+			await exception_nick.callback(interaction=interaction,nick=data[0],days=days,reason=reason)
 		
-		command_init = self.bot.language.commands['unexception_nick']['init']
-		@command_init.command(**self.bot.language.commands['unexception_nick']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['unexception_nick']['choices'])
-		@app_commands.describe(**self.bot.language.commands['unexception_nick']['describe'])
-		@app_commands.rename(**self.bot.language.commands['unexception_nick']['rename'])
-		async def command_unexception_nick(interaction: discord.Interaction, nick: str):
+		@DiscordLanguage.command
+		async def unexception_nick(interaction: discord.Interaction, nick: str):
 			user = await self.remove_exception(nick=nick)
 			if not user:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['unexception_nick']['messages']['account-not-found'])
@@ -420,12 +382,8 @@ class DiscordMinecraft:
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['unexception_nick']['messages']['player-unexceptioned']).safe_substitute(user=user,nick=nick))
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
 		
-		command_init = self.bot.language.commands['unexception_member']['init']
-		@command_init.command(**self.bot.language.commands['unexception_member']['initargs'])
-		@app_commands.choices(**self.bot.language.commands['unexception_member']['choices'])
-		@app_commands.describe(**self.bot.language.commands['unexception_member']['describe'])
-		@app_commands.rename(**self.bot.language.commands['unexception_member']['rename'])
-		async def command_unexception_member(interaction: discord.Interaction, member: discord.Member):
+		@DiscordLanguage.command
+		async def unexception_member(interaction: discord.Interaction, member: discord.Member):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT nick FROM mc_accounts WHERE discordid={member.id}')
 				data=cursor.fetchone()
@@ -433,13 +391,10 @@ class DiscordMinecraft:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['unexception_member']['messages']['account-not-found'])
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 				return
-			await command_unexception_nick.callback(interaction=interaction,nick=data[0])
+			await unexception_nick.callback(interaction=interaction,nick=data[0])
 
-		command_init = self.bot.language.commands['exceptions']['init']
-		@command_init.command(**self.bot.language.commands['exceptions']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['exceptions']['describe'])
-		@app_commands.rename(**self.bot.language.commands['exceptions']['rename'])
-		async def command_exceptions(interaction: discord.Interaction, page: int = 1):
+		@DiscordLanguage.command
+		async def exceptions(interaction: discord.Interaction, page: int = 1):
 			page = 0 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT a.nick,a.discordid,e.start,e.end,e.reason FROM mc_exceptions AS e JOIN mc_accounts AS a ON a.id=e.id ORDER BY start LIMIT {page*25},25 ')
@@ -463,11 +418,8 @@ class DiscordMinecraft:
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['exceptions']['messages']['exception-list']).safe_substitute(players=l))
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
 
-		command_init = self.bot.language.commands['referals_top']['init']
-		@command_init.command(**self.bot.language.commands['referals_top']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['referals_top']['describe'])
-		@app_commands.rename(**self.bot.language.commands['referals_top']['rename'])
-		async def command_referals_top(interaction: discord.Interaction, page: int = 1):
+		@DiscordLanguage.command
+		async def referals_top(interaction: discord.Interaction, page: int = 1):
 			page = 0 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT a.nick,r.user,COUNT(r.referal) as cnt FROM mc_referals AS r JOIN mc_accounts AS a ON a.discordid=r.user GROUP BY user ORDER BY cnt DESC LIMIT {page*25},25')
@@ -490,11 +442,8 @@ class DiscordMinecraft:
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['referals_top']['messages']['referals-list']).safe_substitute(count=count,players=l))
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=False)
 		
-		command_init = self.bot.language.commands['referals_mine']['init']
-		@command_init.command(**self.bot.language.commands['referals_mine']['initargs'])
-		@app_commands.describe(**self.bot.language.commands['referals_mine']['describe'])
-		@app_commands.rename(**self.bot.language.commands['referals_mine']['rename'])
-		async def command_referals_mine(interaction: discord.Interaction, page: int = 1):
+		@DiscordLanguage.command
+		async def referals_mine(interaction: discord.Interaction, page: int = 1):
 			page = 0 if page < 1 else page-1
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT nick,discordid FROM mc_referals JOIN mc_accounts ON discordid=referal WHERE user={interaction.user.id} LIMIT {page*25},25')
@@ -523,7 +472,7 @@ class DiscordMinecraft:
 			if interaction.type == discord.InteractionType.component:
 				customid = interaction.data['custom_id']
 				if customid == "inactive_recovery_start":
-					await command_recovery.callback(interaction)
+					await recovery.callback(interaction)
 				elif customid == "inactive_recovery_approve":
 					with self.bot.cursor() as cursor:
 						cursor.execute(f'SELECT discordid FROM mc_inactive_recovery WHERE messageid={interaction.message.id}')
@@ -669,7 +618,7 @@ class DiscordMinecraft:
 							content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-leaved-message']).safe_substitute(unix_time=unix_time,relative_time=relative_time))
 							await channel.send(embeds=embeds,content=content)
 				elif customid == 'unlink_account':
-					await command_unlink.callback(interaction, app_commands.Choice(name='маня мирок', value=int(interaction.data['values'][0])))
+					await unlink.callback(interaction, app_commands.Choice(name='маня мирок', value=int(interaction.data['values'][0])))
 			elif interaction.type == discord.InteractionType.modal_submit:
 				customid = interaction.data['custom_id']
 				if customid == "inactive_recovery_submit":
@@ -728,12 +677,12 @@ class DiscordMinecraft:
 					nick = interaction.data['components'][0]['components'][0]['value']
 					referal = interaction.data['components'][1]['components'][0]['value']
 					referal = referal if referal.replace(' ','') != '' else None
-					await command_register.callback(interaction, app_commands.Choice(name='bedrock edition', value=1), nick, referal)
+					await register.callback(interaction, app_commands.Choice(name='bedrock edition', value=1), nick, referal)
 				elif customid == "registration_start_java":
 					nick = interaction.data['components'][0]['components'][0]['value']
 					referal = interaction.data['components'][1]['components'][0]['value']
 					referal = referal if referal.replace(' ','') != '' else None
-					await command_register.callback(interaction, app_commands.Choice(name='java edition', value=0), nick, referal)
+					await register.callback(interaction, app_commands.Choice(name='java edition', value=0), nick, referal)
 				elif customid == "registration_stage":
 					with self.bot.cursor() as cursor:
 						cursor.execute(f'SELECT id,stage,nick,referal FROM mc_registrations WHERE discordid={interaction.user.id} AND channelid={interaction.channel.id}')
