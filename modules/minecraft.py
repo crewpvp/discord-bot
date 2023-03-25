@@ -38,7 +38,8 @@ class DiscordMinecraft:
 
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_registrations (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL,uuid UUID NOT NULL, nick CHAR(32) NOT NULL, referal BIGINT, channelid BIGINT UNIQUE, channel_deleted BOOL NOT NULL DEFAULT FALSE, messageid BIGINT UNIQUE, time INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), stage TEXT NOT NULL,sended INT(11), approved BOOL NOT NULL DEFAULT FALSE, closed INT(11), close_reason TEXT, PRIMARY KEY (id))")
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_registrations_answers (id INT NOT NULL, stage TEXT NOT NULL, question TEXT NOT NULL, answer TEXT, FOREIGN KEY(id) REFERENCES mc_registrations(id) ON DELETE CASCADE)")
-		
+			cursor.execute("CREATE TABLE IF NOT EXISTS mc_inactive_recovery (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL,messageid BIGINT NOT NULL, sended INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), approved BOOL NOT NULL DEFAULT FALSE, closed INT(11), close_reason TEXT, PRIMARY KEY(id), FOREIGN KEY(discordid) REFERENCES mc_accounts(discordid) ON DELETE CASCADE ON UPDATE CASCADE)")
+			
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_change_nickname (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL, nick CHAR(32), PRIMARY KEY (id))")
 			
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_referals (user BIGINT NOT NULL,referal BIGINT NOT NULL UNIQUE)")
@@ -76,7 +77,7 @@ class DiscordMinecraft:
 					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['recovery']['messages']['account-not-found'])
 					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
-				cursor.execute(f'SELECT id FROM mc_inactive_recovery WHERE discordid=\'{interaction.user.id}\' AND sended IS NOT NULL AND closed IS NULL')
+				cursor.execute(f'SELECT id FROM mc_inactive_recovery WHERE discordid=\'{interaction.user.id}\' AND closed IS NULL')
 				if cursor.fetchone():
 					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['recovery']['messages']['active-recovery-exists'])
 					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
@@ -159,6 +160,11 @@ class DiscordMinecraft:
 				if referal:
 					if not (referal:=self.fetchDiscordByNick(referal)):
 						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['referal-not-found'])
+						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+						return
+					cursor.execute(f'SELECT user,referal FROM mc_referals WHERE user={interaction.user.id} AND referal={referal}')
+					if cursor.fetchone():
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['referal-not-referal'])
 						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 
@@ -581,12 +587,14 @@ class DiscordMinecraft:
 							cursor.execute(f'UPDATE mc_registrations SET approved=TRUE, closed=UNIX_TIMESTAMP(), close_reason = \'Заявка одобрена {interaction.user}\' WHERE messageid={interaction.message.id}')
 							cursor.execute(f'INSERT INTO mc_accounts (id, nick, discordid, pseudonym) VALUES (\'{uuid}\',\'{nick}\',\'{discordid}\',\'{nick}\')')
 							if referal:
-								cursor.execute(f'INSERT INTO mc_referals (user,referal) VALUES ({referal},{member.id})')
-								referal = interaction.guild.get_member(referal)
-								if 'premium' in self.bot.enabled_modules:
-									await self.bot.modules['premium'].add_premium(member=member,hours=12,days=3)
-									if referal:
-										await self.bot.modules['premium'].add_premium(member=referal,days=7)
+								cursor.execute(f'SELECT user,referal FROM mc_referals WHERE user={member.id} AND referal={referal}')
+								if not cursor.fetchone():
+									cursor.execute(f'INSERT INTO mc_referals (user,referal) VALUES ({referal},{member.id})')
+									referal = interaction.guild.get_member(referal)
+									if 'premium' in self.bot.enabled_modules:
+										await self.bot.modules['premium'].add_premium(member=member,hours=12,days=3)
+										if referal:
+											await self.bot.modules['premium'].add_premium(member=referal,days=7)
 
 							try:
 								await member.remove_roles(interaction.guild.get_role(self.inactive_role))
@@ -623,10 +631,10 @@ class DiscordMinecraft:
 				customid = interaction.data['custom_id']
 				if customid == "inactive_recovery_submit":
 					with self.bot.cursor() as cursor:
-						cursor.execute(f'SELECT id FROM mc_inactive_recovery WHERE discordid=\'{interaction.user.id}\' AND sended IS NOT NULL AND closed IS NULL')
+						cursor.execute(f'SELECT id FROM mc_inactive_recovery WHERE discordid=\'{interaction.user.id}\' AND closed IS NULL')
 						if not cursor.fetchone():
 							with self.bot.cursor() as cursor:
-								cursor.execute(f'SELECT ((SUM(closed)-SUM(sended))/COUNT(*)) FROM mc_inactive_recovery WHERE closed IS NOT NULL AND sended IS NOT NULL')
+								cursor.execute(f'SELECT ((SUM(closed)-SUM(sended))/COUNT(*)) FROM mc_inactive_recovery WHERE closed IS NOT NULL')
 								values = cursor.fetchone()
 							if values[0]:
 								time = relativeTimeParser(seconds=values[0],greater=True)
@@ -997,16 +1005,14 @@ class DiscordMinecraft:
 			user = Template(self.bot.language.commands['register']['messages']['user-format']).safe_substitute(user=raw_user)
 			raw_nick = nick.replace('_','\\_')
 			nick = Template(self.bot.language.commands['register']['messages']['nick-format']).safe_substitute(nick=raw_nick)
+			inviter = Template(self.bot.language.commands['register']['messages']['inviter-format']).safe_substitute(user=referal.mention) if referal else ''
 			embed = discord.Embed(
-				title = Template(self.bot.language.commands['register']['messages']['embed-title']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user),
-				description = Template(self.bot.language.commands['register']['messages']['embed-description']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user).replace('\\n','\n'),
+				title = Template(self.bot.language.commands['register']['messages']['embed-title']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,inviter=inviter,id=id),
+				description = Template(self.bot.language.commands['register']['messages']['embed-description']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,inviter=inviter,id=id).replace('\\n','\n'),
 				colour = discord.Colour.from_rgb(100, 100, 100)
 			)
-			if referal:
-				field_name = Template(self.bot.language.commands['register']['messages']['referal-field-name']).safe_substitute(user=referal.mention)
-				field_value =  Template(self.bot.language.commands['register']['messages']['referal-field-value']).safe_substitute(user=referal.mention)
-				embed.add_field(name=field_name, value=field_value, inline=False)
-			content = Template(self.bot.language.commands['register']['messages']['content']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user)
+			
+			content = Template(self.bot.language.commands['register']['messages']['content']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user, inviter=inviter,id=id)
 			for answer in self.parseAnswers(id):
 				embed.add_field(name=answer[0],value=answer[1],inline=False)
 			view = discord.ui.View(timeout=None)
@@ -1031,6 +1037,8 @@ class DiscordMinecraft:
 			data = cursor.fetchone()
 			if not data:
 				return False
+			cursor.execute('SELECT AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'mc_inactive_recovery\'')
+			newid = cursor.fetchone()[0]
 			id, nick, time_played, first_join, last_join = data
 			cursor.execute(f'SELECT bedrockUsername FROM LinkedPlayers WHERE javaUniqueId=UNHEX(REPLACE(\'{id}\', \'-\', \'\'))')
 			data = cursor.fetchone()
@@ -1054,11 +1062,11 @@ class DiscordMinecraft:
 			else:
 				time_played = ''
 			embed = discord.Embed(
-				title = Template(self.bot.language.commands['recovery']['messages']['embed-title']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,time_played=time_played,last_join=last_join,first_join=first_join),
-				description = Template(self.bot.language.commands['recovery']['messages']['embed-description']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,time_played=time_played,last_join=last_join,first_join=first_join).replace('\\n','\n'),
+				title = Template(self.bot.language.commands['recovery']['messages']['embed-title']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,time_played=time_played,last_join=last_join,first_join=first_join,id=newid),
+				description = Template(self.bot.language.commands['recovery']['messages']['embed-description']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,time_played=time_played,last_join=last_join,first_join=first_join,id=newid).replace('\\n','\n'),
 				colour = discord.Colour.from_rgb(100, 100, 100)
 				)
-			content = Template(self.bot.language.commands['recovery']['messages']['content']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,time_played=time_played,last_join=last_join,first_join=first_join)
+			content = Template(self.bot.language.commands['recovery']['messages']['content']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,time_played=time_played,last_join=last_join,first_join=first_join,id=newid)
 			questions = self.recovery_questions()
 			if answers:
 				for i in range(len(questions)):

@@ -19,17 +19,6 @@ class DiscordLanguage():
 			for group_name in command_groups.keys():
 				group_description = command_groups[group_name]
 				self.groups[group_name] = app_commands.Group(name=group_name, description=group_description) 
-	@staticmethod
-	def command(func):
-		command = DiscordLanguage.instance.commands[func.__name__]
-		return command['init'].command(**command['initargs'])(
-			app_commands.describe(**command['describe'])(
-				app_commands.rename(**command['rename'])(
-					app_commands.choices(**command['choices'])(
-						func)
-					)
-				)
-			)
 
 	def register_groups(self):
 		guild = self.bot.guild_object()
@@ -73,3 +62,15 @@ class DiscordLanguage():
 								autocompletes.append(app_commands.Choice(name=value, value=value))
 							self.commands[command_name]['autocomplete'][argument_name] = lambda interaction,current: [autocomplete for autocomplete in autocompletes if current.lower() in autocomplete.name.lower()]
 				self.commands[command_name]['messages'] = command['messages'] if 'messages' in command else {}
+
+	@staticmethod
+	def command(func):
+		command = DiscordLanguage.instance.commands[func.__name__]
+		return command['init'].command(**command['initargs'])(
+			app_commands.describe(**command['describe'])(
+				app_commands.rename(**command['rename'])(
+					app_commands.choices(**command['choices'])(
+						func)
+					)
+				)
+			)
