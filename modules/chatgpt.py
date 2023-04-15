@@ -14,12 +14,12 @@ def to_thread(func: typing.Callable) -> typing.Coroutine:
 	return wrapper
 
 class DiscordChatGPT:
-	def __init__(self, bot, session_token: str, allowed_roles: [int,...], error_messages: [str,...]):
+	def __init__(self, bot, access_token: str, allowed_roles: [int,...], error_messages: [str,...]):
 		self.bot = bot
 		self.allowed_roles = allowed_roles
 		self.error_messages = error_messages
 		self.conversation_id = None
-		self.chatgpt = Chatbot(config={ "session_token":session_token })
+		self.chatgpt = Chatbot(config={ "access_token":access_token })
 
 		self.blocked = False
 		self.delayed_questions = {}
@@ -100,6 +100,16 @@ class DiscordChatGPT:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updateconversation']['messages']['conversation-updated'])
 			except:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updateconversation']['messages']['error-on-conversation-update'])
+			await interaction.followup.send(content=content,embeds=embeds,ephemeral=True)
+		
+		@DiscordLanguage.command
+		async def chatgpt_updatetoken(interaction: discord.Interaction, token: str):
+			await interaction.response.defer(ephemeral=True)
+			try:
+				self.chatgpt = Chatbot(config={ "access_token": token })
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updatetoken']['messages']['token-updated'])
+			except:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updatetoken']['messages']['error-on-token-update'])
 			await interaction.followup.send(content=content,embeds=embeds,ephemeral=True)
 
 	async def create_conversation(self):

@@ -2,12 +2,12 @@ command_groups:
   premium: 'управление премиумом пользователей'
   message: 'управление сообщениями от бота'
   chatgpt: 'управление чат ботом'
-  profile: 'управление профилем'
+  profiles: 'управление профилем'
   tickets: 'управление тикетами'
   registration: 'управление регистрацией'
   exception: 'управление исключениями с игрового сервера'
   unexception: 'управление исключениями с игрового сервера'
-  referals: 'управление приглашенными участниками'
+  top: 'топы'
 commands:
   nickcolor:
     name: 'nickcolor' #как вызывается команда (/nickcolor <>)
@@ -57,14 +57,14 @@ commands:
     arguments:
       member:
         rename: 'пользователь'
-        describe: 'введенный пользователь Discord будет попущен как петух на зоне'
+        describe: 'введенный пользователь Discord будет лишён премиума'
     messages:
       # у пользователя не был найден премиум
       # ${user} - упоминание пользователя
-      premium-not-found: '{"embeds": [{"description": "${user} и так нищета ебанная","color": 65280}]}'
+      premium-not-found: '{"embeds": [{"description": "${user} не имеет премиума","color": 16711680}]}'
       # премиум был удален у пользователя
       # ${user} - упоминание пользователя
-      premium-removed: '{"embeds": [{"description": "${user} получил хуй вместо леденца","color": 65280}]}'
+      premium-removed: '{"embeds": [{"description": "${user} лишён премиума","color": 65280}]}'
   message_sendraw:
     group: 'message'
     name: 'sendraw'
@@ -187,10 +187,17 @@ commands:
     messages:
       conversation-updated: '{"embeds": [{"description": "Новый чат создан","color": 65280}]}'
       error-on-conversation-update: '{"embeds": [{"description": "Чат не был создан, возможно какие-то проблемы на стороне OpenAI, попробуйте позже","color": 16711680}]}'
+  chatgpt_updatetoken:
+    group: 'chatgpt'
+    name: 'updatetoken'
+    description: 'обновить токен бота'
+    messages:
+      token-updated: '{"embeds": [{"description": "Токен обновлен","color": 65280}]}'
+      error-on-token-update: '{"embeds": [{"description": "Токен не был обновлен, проверьте что вы получили его [тут](https://chat.openai.com/api/auth/session)","color": 16711680}]}'
   profile_age:
     name: 'age'
     description: 'установить/удалить возраст в профиле'
-    group: 'profile'
+    group: 'profiles'
     arguments:
       age:
         rename: 'возраст'
@@ -202,7 +209,7 @@ commands:
   profile_name:
     name: 'name'
     description: 'установить/удалить имя в профиле'
-    group: 'profile'
+    group: 'profiles'
     arguments:
       name:
         rename: 'имя'
@@ -217,7 +224,7 @@ commands:
   profile_gender:
     name: 'gender'
     description: 'установить/удалить пол в профиле'
-    group: 'profile'
+    group: 'profiles'
     arguments:
       gender:
         rename: 'пол'
@@ -231,7 +238,7 @@ commands:
       gender-changed: '{"embeds": [{"description": "Ваше пол изменен на ${gender}","color": 65280}]}'
   profile_reputation:
     name: 'reputation'
-    group: 'profile'
+    group: 'profiles'
     description: 'установить пользователю репутацию'
     arguments:
       member:
@@ -248,8 +255,7 @@ commands:
       positive-reputation: '{"embeds": [{"description": "${user} +${reputation}","color": 65280}]}'
       negative-reputation: '{"embeds": [{"description": "${user} -${reputation}","color": 16711680}]}'
   profile_me:
-    group: 'profile'
-    name: 'me'
+    name: 'profile'
     description: 'показать ваш профиль'
     arguments:
       hide:
@@ -258,7 +264,7 @@ commands:
           'нет': 0
           'да': 1
   profile_nick:
-    group: 'profile'
+    group: 'profiles'
     name: 'nick'
     description: 'показать профиль пользователя по игровому нику'
     arguments:
@@ -273,7 +279,7 @@ commands:
       user-leaved: '{"embeds": [{"description": "Пользователь покинул Discord сервер","color": 16711680}]}'
       user-not-found: '{"embeds": [{"description": "Информации по данному нику не найдено","color": 16711680}]}'
   profile_member:
-    group: 'profile'
+    group: 'profiles'
     name: 'member'
     description: 'показать профиль пользователя'
     arguments:
@@ -499,8 +505,9 @@ commands:
       # ${raw_user} - упоминание пользователя
       # ${user} - упоминание по формату
       # ${nick} - ник по формату
+      # ${id} - номер заявки
       # остальное - поля по формату
-      embed-title: 'Заявка от ${raw_nick}'
+      embed-title: 'Заявка на восстановление #${id}'
       embed-description: '${nick}${user}${first_join}${last_join}${time_played}'
       content: ''
 
@@ -510,9 +517,9 @@ commands:
       decline-button-color: 4
 
       # ${time} - среднее время обработки в формате 15 минут/секунд..
-      average-time-format: '\nСреднее время обработки заявки ${time}'
-      dm-create-message: '{"embeds": [{"title":"Восстановление crewpvp.xyz","description": "Заявка на восстановление создана.\nОжидайте решение модерации${time}","color": 65280}]}'
-      response-create-message: '{"embeds": [{"description": "Заявка на восстановление создана.\nОжидайте решение модерации${time}","color": 65280}]}'
+      average-time-format: ',"footer": {"text": "Среднее время обработки заявки ${time}"}'
+      dm-create-message: '{"embeds": [{"fields":[{"name":"Восстановление игрового аккаунта","value": "Заявка на восстановление создана!\nОжидайте решение модерации."}]${time},"color": 65280}]}'
+      response-create-message: '{"embeds": [{"description": "Заявка на восстановление создана!\nОжидайте решение модерации."${time},"color": 65280}]}'
 
       # ${time} - время в формате UNIX TIME
       # ${user} - упоминание пользователя, который ответил на заявку
@@ -527,10 +534,10 @@ commands:
       author-leaved-field-name: 'Отклонено <t:${time}:R>'
       author-leaved-field-value: 'Автор заявки покинул Discord сервер'
 
-      dm-accepted-message: '{"embeds": [{"title":"Восстановление crewpvp.xyz","description": "Ваша заявка была одобрена! Приятной игры!","color": 65280}]}'
+      dm-accepted-message: '{"embeds": [{"fields":[{"name":"Восстановление игрового аккаунта","value":"Ваша заявка была одобрена! Приятной игры!"}],"color": 65280}]}'
       # ${reason} - причина указанная в отклонении
       dm-declined-reason-format: '\n По причине ${reason}'
-      dm-declined-message: '{"embeds": [{"title":"Восстановление crewpvp.xyz","description": "Ваша заявка была отклонена!${reason}","color": 65280}]}'
+      dm-declined-message: '{"embeds": [{"fields":[{"name":"Восстановление игрового аккаунта","value":"Ваша заявка была отклонена${reason}"}],"color": 16711680}]}'
 
       decline-modal-title: 'Отказ заявки'
       decline-modal-label: 'Опишите причину отказа'
@@ -544,7 +551,7 @@ commands:
       authorized: '{"embeds": [{"description": "Вы успешно авторизованы","color": 65280}]}'
   logout:
     name: 'logout'
-    description: 'выйти с игрового аккаунта'
+    description: 'выйти из игрового аккаунта'
     messages:
       not-registered: '{"embeds": [{"description": "Вы не зарегистрированны на игровом сервере","color": 16711680}]}'
       not-logged: '{"embeds": [{"description": "Вы и так не авторизованны","color": 16711680}]}'
@@ -576,6 +583,7 @@ commands:
         rename: 'ник_пригласившего'
         describe: 'укажите тут Discord ник или игровой ник'
     messages:
+      referal-not-referal: '{"embeds": [{"description": "Вы не можете быть приглашены пользователем, который приглашён вами","color": 16711680}]}'
       nick-already-registered: '{"embeds": [{"description": "Данный аккаунт уже зарегистрирован на игровом сервере","color": 16711680}]}'
       active-registration-exists: '{"embeds": [{"description": "У вас уже есть активная заявка на верификацию","color": 16711680}]}'
       referal-not-found: '{"embeds": [{"description": "Аккаунт, связанный с ником, который вы указали как пригласившего не найден","color": 16711680}]}'
@@ -593,12 +601,12 @@ commands:
       registartion-bedrock-modal-title: 'Регистрация Bedrock Edition'
       registration-nick-input-label: 'Ваш никнейм'
       registration-nick-input-placeholder: 'Введите его сюда'
-      registration-referal-input-label: 'Кто вас пригласил? (укажите ник)'
+      registration-referal-input-label: 'Кто вас пригласил?'
       registration-referal-input-placeholder: 'Введите ник (необязательно)'
 
       registration-decline-modal-title: 'Отказ заявки'
       registration-decline-modal-label: 'Опишите причину отказа'
-      registration-decline-modal-placeholder: 'Шизик не сможет играть? Грустно.'
+      registration-decline-modal-placeholder: 'Шизик не сможет играть? Похуй.'
 
       invalid-registration-user: '{"embeds": [{"description": "Вы не являетесь участником данной регистрации","color": 16711680}]}'
 
@@ -606,17 +614,18 @@ commands:
     # regsister channel:
       nick-format: '**Никнейм:** ${nick}\n'
       user-format: '**Discord аккаунт:** ${user}\n'
+      # ${user} - упоминание пользователя, который пригласил
+      inviter-format: '**Приглашён:** ${user}\n'
+      # ${inviter} - ник пригласившего
       # ${raw_nick} - ник пользователя
       # ${raw_user} - упоминание пользователя
       # ${user} - упоминание по формату
+      # ${id} - номер заявки
       # ${nick} - ник по формату
-      embed-title: 'Заявка от ${raw_nick}'
-      embed-description: '${nick}${user}'
+      embed-title: 'Заявка на регистрацию #${id}'
+      embed-description: '${nick}${user}${inviter}'
       content: ''
 
-      referal-field-name: 'Пригласивший'
-      # ${user} - упоминание пользователя, который пригласил
-      referal-field-value: '${user}'
 
       accept-button-label: 'Одобрить'
       accept-button-color: 3
@@ -638,31 +647,29 @@ commands:
 
     # user dm or channel  
       # ${time} - среднее время обработки в формате 15 минут/секунд..
-      average-time-format: '\nСреднее время обработки заявки ${time}'
-      dm-create-message: '{"embeds": [{"title":"Регистрация crewpvp.xyz","description": "Заявка на регистрацию создана.\nОжидайте решение модерации${time}","color": 65280}]}'
-      channel-create-message: '{"embeds": [{"description": "Заявка на регистрацию создана.\nОжидайте решение модерации${time}","color": 65280}]}'
+      average-time-format: ',"footer": {"text": "Среднее время обработки заявки ${time}"}'
+      dm-create-message: '{"embeds": [{"fields":[{"name":"Регистрация на игровом сервере","value": "Заявка на регистрацию создана!\nОжидайте решение модерации."}]${time},"color": 65280}]}'
+      channel-create-message: '{"embeds": [{"description": "Заявка на регистрацию создана!\nОжидайте решение модерации."${time},"color": 65280}]}'
 
       # ${unix_time} - время когда истекает задержка для создания заявки в формате UNIX TIME
       # ${relative_time} - время через сколько истекает задержка в формате 15 минут/секунд...
-      channel-leaved-message: '{"embeds": [{"description": "Ваша заявка была отклонена, так как вы покинули Discord сервер","color": 16711680}]}'
+      channel-leaved-message: '{"embeds": [{"fields":[{"name":"Регистрация на игровом сервере","value": "Ваша заявка была отклонена, так как вы покинули Discord сервер"}],"color": 16711680}]}'
 
-      # ${unix_time} - время когда истекает задержка для создания заявки в формате UNIX TIME
-      # ${relative_time} - время через сколько истекает задержка в формате 15 минут/секунд...
-      dm-accepted-message: '{"embeds": [{"title":"Регистрация crewpvp.xyz","description": "Ваша заявка была одобрена! Приятной игры!","color": 65280}]}'
+      dm-accepted-message: '{"embeds":[{"color":65280,"fields":[{"name":"Регистрация на игровом сервере","value":"Ваша заявка была одобрена! Приятной игры!"},{"name":"Информбюро: о режимах","value":"У сервера существует информбюро «о режимах»\nНайти его можно по ссылке [info.crewpvp.xyz](https://info.crewpvp.xyz/) или в канале <#967423687965966336>"},{"name":"Информбюро: тикеты","value":"Вам нужна помощь? Напишите свой вопрос в тикете и мы поможем\nКанал: <#1022157438033608774>"}]}]}'
       
       # ${reason} - причина указанная в отклонении
       dm-declined-reason-format: '\n По причине ${reason}'
       # ${unix_time} - время когда истекает задержка для создания заявки в формате UNIX TIME
       # ${relative_time} - время через сколько истекает задержка в формате 15 минут/секунд...
-      dm-declined-message: '{"embeds": [{"title":"Регистрация crewpvp.xyz","description": "Ваша заявка была отклонена!${reason}","color": 16711680}]}'
+      dm-declined-message: '{"embeds":[{"fields":[{"name":"Регистрация на игровом сервере","value":"Ваша заявка была отклонена!${reason}","color":16711680,"footer":{"text":"Вы сможете повторить попытку через ${relative_time}"}}]}'
 
-      channel-accepted-message: '{"embeds": [{"description": "Ваша заявка была одобрена! Приятной игры!","color": 65280}]}'
+      channel-accepted-message: '{"embeds":[{"color":65280,"fields":[{"name":"Регистрация на игровом сервере","value":"Ваша заявка была одобрена! Приятной игры!"},{"name":"Вам выдана роль с полным доступом к разделу Minecraft","value":"Познакомьтесь с другими пользователями, имеющими роль <@&943836722557513779>\nБудьте уверены, большинство будет радо пообщаться и поиграть вместе!"},{"name":"Информбюро: о режимах","value":"У сервера существует информбюро «о режимах»\nНайти его можно по ссылке [info.crewpvp.xyz](https://info.crewpvp.xyz/) или в канале <#967423687965966336>"},{"name":"Информбюро: тикеты","value":"Вам нужна помощь? Напишите свой вопрос в тикете и мы поможем\nКанал: <#1022157438033608774>"}]}]}'
       # ${reason} - причина указанная в отклонении
       channel-declined-reason-format: '\n По причине ${reason}'
       # ${unix_time} - время когда истекает задержка для создания заявки в формате UNIX TIME
       # ${relative_time} - время через сколько истекает задержка в формате 15 минут/секунд...
 
-      channel-declined-message: '{"embeds": [{"description": "Ваша заявка была отклонена!${reason}","color": 16711680}]}'
+      channel-declined-message: '{"embeds":[{"fields":[{"name":"Регистрация на игровом сервере","value":"Ваша заявка была отклонена!${reason}"}],"color":16711680,"footer":{"text":"Вы сможете повторить попытку через ${relative_time}"}}]}'
   link:
     name: 'link'
     description: 'привязать второй аккаунт'
@@ -698,8 +705,9 @@ commands:
       account-not-found: '{"embeds": [{"description": "У вас не найден второй аккаунт","color": 16711680}]}'
       account-unlinked: '{"embeds": [{"description": "Аккаунт успешно отвязан","color": 65280}]}'
   shizotop:
-    name: 'shizotop'
-    description: 'список шизов без личной жизни'
+    name: 'activity'
+    group: 'top'
+    description: 'топ самых активных игроков'
     arguments:
       page:
         rename: 'страница'
@@ -712,8 +720,8 @@ commands:
       # чем соединять player-format
       join-by: '\n'
       # ${players} - список игроков в формате указанном выше
-      shizo-list: '{"embeds": [{"title": "Топ шизов", "description": "Личная шизнь вышла из чата\n\n${players}","color": 65280}]}'
-      empty-shizo-list: '{"embeds": [{"description": "Ноль игроков нахуй. Крев сдох блять","color": 16711680}]}'
+      shizo-list: '{"embeds": [{"title": "Топ активности", "description": "Личная шизнь вышла из чата\n\n${players}","color": 65280}]}'
+      empty-shizo-list: '{"embeds": [{"description": "Ноль игроков нахуй. Крев сдох блять.","color": 16711680}]}'
   exception_nick:
     name: 'nick'
     description: 'исключить малого на срок по нику'
@@ -793,9 +801,9 @@ commands:
       exception-list: '{"embeds": [{"title": "Список исключенных", "description": "Вот они, игровые импотенты.\n\n${players}","color": 65280}]}'
       empty-exception-list: '{"embeds": [{"description": "Исключенные не найдены.","color": 16711680}]}'
   referals_top:
-    name: 'top'
-    group: 'referals'
-    description: 'топ приглашенцев'
+    name: 'inviters'
+    group: 'top'
+    description: 'топ пользоваталей по приглашённым игрокам'
     arguments:
       page:
         rename: 'страница'
@@ -809,10 +817,9 @@ commands:
       join-by: '\n'
       # ${players} - список игроков в формате указанном выше
       referals-list: '{"embeds": [{"title": "Топ приглашений", "description": "У них похоже много друзей, не так-ли?\n\n${players}","color": 65280}]}'
-      empty-referals-list: '{"embeds": [{"description": "Никто никого не приглашал. Грусть.","color": 16711680}]}'
+      empty-referals-list: '{"embeds": [{"description": "Никто никого не приглашал. Молчат дома.","color": 16711680}]}'
   referals_mine:
-    name: 'mine'
-    group: 'referals'
+    name: 'referals'
     description: 'список приглашенных вами игроков'
     arguments:
       page:
@@ -826,6 +833,6 @@ commands:
       join-by: '\n'
       # ${players} - список игроков в формате указанном выше
       # ${count} - количество приглашенных
-      referals-list: '{"embeds": [{"title": "Ваши ~~поклонники~~ приглашенцы)", "description": "Всего: ${count}\n\n${players}","color": 65280}]}'
+      referals-list: '{"embeds": [{"title": "Приглашённые вами", "description": "Всего: ${count}\n\n${players}","color": 65280}]}'
       empty-referals-list: '{"embeds": [{"description": "Похоже у вас нету поклонников, но вы можете это исправить.\nПопросите указать ваш игровой ник при регистрации\nВы и ваш товарищ получите премиум","color": 16711680}]}'
 
