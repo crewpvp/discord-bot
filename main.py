@@ -111,7 +111,11 @@ class Bot(discord.Client):
 		self.run(self.config['discord']['token'])
 		
 	def cursor(self):
-		return self.connection.cursor()
+		try:
+			return self.connection.cursor()
+		except:
+			self.connection = mariadb.connect(**self.config['mariadb'], autocommit=True)
+			return self.connection.cursor()
 
 	def guild(self):
 		return self.get_guild(self.guild_id)
