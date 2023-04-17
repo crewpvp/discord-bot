@@ -107,6 +107,7 @@ class DiscordChatGPT:
 			await interaction.response.defer(ephemeral=True)
 			try:
 				self.chatgpt = Chatbot(config={ "access_token": token })
+				self.load_conversation()
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updatetoken']['messages']['token-updated'])
 			except:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updatetoken']['messages']['error-on-token-update'])
