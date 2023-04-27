@@ -48,11 +48,13 @@ class DiscordVkMemes:
 					if post.attachments[0].photo is None:
 						continue
 					photos = []
-
-					for photo in post.attachments:
-						photos.append(discord.File(BytesIO(await self.download_raw_file(max(photo.photo.sizes, key=lambda x: (x.height, x.width)).url)),filename="image.png"))
-					for channel in channels:
-						await channel.send(files=photos)
+					try:
+						for photo in post.attachments:
+							photos.append(discord.File(BytesIO(await self.download_raw_file(max(photo.photo.sizes, key=lambda x: (x.height, x.width)).url)),filename="image.png"))
+						for channel in channels:
+							await channel.send(files=photos)
+					except:
+						pass
 			with open('vkmemes.json', 'w') as outfile:
 				json.dump(self.last_posts, outfile)
 		self.check = check
