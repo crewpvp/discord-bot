@@ -106,7 +106,7 @@ class DiscordTickets:
 					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
 				text = interaction.data['components'][0]['components'][0]['value']
-				await command_ticket_create.callback(interaction,text)
+				await ticket_create.callback(interaction,text)
 			elif interaction.type == discord.InteractionType.component:
 				customid = interaction.data['custom_id']
 				if customid == "ticket_create":
