@@ -15,23 +15,24 @@ def to_thread(func: typing.Callable) -> typing.Coroutine:
 	return wrapper
 
 class DiscordChatGPT:
-	def __init__(self, bot, access_token: str, allowed_roles: [int,...], error_messages: [str,...]):
+	def __init__(self, bot, allowed_roles: [int,...], error_messages: [str,...]):
 		self.bot = bot
 		self.allowed_roles = allowed_roles
 		self.error_messages = error_messages
+
 		self.conversation_id = None
-		self.chatgpt = Chatbot(config={ "access_token":access_token })
+		self.access_token = None
+		self.chatgpt = None
+
 		self.last_error = None
 		self.blocked = False
 		self.delayed_questions = {}
 		self.last_answer_time = datetime.now().timestamp()
 		self.last_answer_id = None
+		
 		async def message(message):
-			if not self.conversation_id:
-				try:
-					await self.load_conversation()
-				except:
-					return
+			if not self.chatgpt and not self.load_data():
+				return
 			if self.bot.user == message.author:
 				return
 			if message.guild.id != self.bot.guild_id:
@@ -96,22 +97,22 @@ class DiscordChatGPT:
 		@DiscordLanguage.command
 		async def chatgpt_updateconversation(interaction: discord.Interaction):
 			await interaction.response.defer(ephemeral=True)
-			try:
-				await self.create_conversation()
+			if await self.create_conversation():
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updateconversation']['messages']['conversation-updated'])
-			except:
+			else:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updateconversation']['messages']['error-on-conversation-update'])
 			await interaction.followup.send(content=content,embeds=embeds,ephemeral=True)
 		
 		@DiscordLanguage.command
 		async def chatgpt_updatetoken(interaction: discord.Interaction, token: str):
 			await interaction.response.defer(ephemeral=True)
-			try:
-				self.chatgpt = Chatbot(config={ "access_token": token })
-				self.load_conversation()
-				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updatetoken']['messages']['token-updated'])
-			except:
+			self.access_token = token
+			self.chatgpt = Chatbot(config={ "access_token": self.access_token })
+			if not self.conversation_id and not await self.create_conversation():
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updatetoken']['messages']['error-on-token-update'])
+			else:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updatetoken']['messages']['token-updated'])
+				self.save_data()
 			await interaction.followup.send(content=content,embeds=embeds,ephemeral=True)
 
 		@DiscordLanguage.command
@@ -124,20 +125,29 @@ class DiscordChatGPT:
 			await interaction.response.send_message(content=content,embeds=embeds,ephemeral=True)
 
 	async def create_conversation(self):
-		self.conversation_id = None
-		await self.get_answer('Привет, сразу поясняю как будет работать наше общение. Тебя добавили в чат и будут присылать тебе сообщения пользователей  в формате:\nникнейм: сообщение\nИногда в начале запроса будут встречаться пояснения как тебе следует отвечать')
-		self.conversation_id = self.chatgpt.conversation_id
+		try:
+			self.conversation_id = None
+			await self.get_answer('Привет, сразу поясняю как будет работать наше общение. Тебя добавили в чат и будут присылать тебе сообщения пользователей  в формате:\nникнейм: сообщение\nИногда в начале запроса будут встречаться пояснения как тебе следует отвечать')
+			self.conversation_id = self.chatgpt.conversation_id
+			self.save_data()
+			return True
+		except Exception as e:
+			self.last_error = e
+			return None
+		
+	def save_data(self):
 		with open('chatgpt.json', 'w') as outfile:
-			json.dump({'last_conversation':self.conversation_id}, outfile)
-	async def load_conversation(self):
+			json.dump({'last-conversation':self.conversation_id,'access-token':self.access_token}, outfile)
+	def load_data(self):
 		if os.path.isfile("chatgpt.json"):
 			with open('chatgpt.json') as json_file:
 				data = json.load(json_file)
-				if 'last_conversation' in data:
-					self.conversation_id = data['last_conversation']
-					return
-		await self.create_conversation()
-
+				self.access_token = data['access-token']
+				self.conversation_id = data['last-conversation']
+				self.chatgpt = Chatbot(config={ "access_token": self.access_token })
+				return True
+		return None
+	
 	@to_thread
 	def get_answer(self,question):
 		for data in self.chatgpt.ask(question,conversation_id = self.conversation_id):

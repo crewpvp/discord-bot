@@ -61,8 +61,7 @@ modules:
     settings:
       allowed_roles:
       - 1011406663959449681
-      access_token: 'myaccesstoken' 
-      # https://chat.openai.com/api/auth/session
+      # get access token at https://chat.openai.com/api/auth/session then run `/chatgpt updatetoken <token>` command
       error_messages:
       - 'Извините, я занят обучением новых навыков.'
       - 'Я сейчас в режиме обновления системы, не могу отвечать на вопросы.'
