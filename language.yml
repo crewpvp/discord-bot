@@ -8,6 +8,7 @@ command_groups:
   exception: 'управление исключениями с игрового сервера'
   unexception: 'управление исключениями с игрового сервера'
   top: 'топы'
+  change: 'изменить'
 commands:
   nickcolor:
     name: 'nickcolor' #как вызывается команда (/nickcolor <>)
@@ -194,6 +195,13 @@ commands:
     messages:
       token-updated: '{"embeds": [{"description": "Токен обновлен","color": 65280}]}'
       error-on-token-update: '{"embeds": [{"description": "Токен не был обновлен, проверьте что вы получили его [тут](https://chat.openai.com/api/auth/session)","color": 16711680}]}'
+  chatgpt_lasterror:
+    group: 'chatgpt'
+    name: 'lasterror'
+    description: 'получить причину последней ошибки'
+    messages:
+      last-error: '{"embeds": [{"description": "Текст последней ошибки: ```${error}```","color": 65280}]}'
+      no-last-error: '{"embeds": [{"description": "Ошибок не было","color": 16711680}]}'
   profile_age:
     name: 'age'
     description: 'установить/удалить возраст в профиле'
@@ -679,6 +687,7 @@ commands:
         describe: 'укажите ник вашего второго аккаунт'
     messages:
       account-not-found: '{"embeds": [{"description": "Вы не зарегистрированны на игровом сервере","color": 16711680}]}'
+      link-cooldown: '{"embeds": [{"description": "Вы сможете сделать привязку второго аккаунта <t:${time}:R>","color": 16711680}]}'
       nick-already-registered: '{"embeds": [{"description": "Данный аккаунт уже зарегистрирован на игровом сервере","color": 16711680}]}'
       incorrect-bedrock-nick: '{"embeds": [{"description": "Неверно указан ник для второго аккаунта","color": 16711680}]}'
       incorrect-java-nick: '{"embeds": [{"description": "Неверно указан ник для второго аккаунта","color": 16711680}]}'
@@ -704,6 +713,22 @@ commands:
       select-java-description: 'Ник: ${nick}'
       account-not-found: '{"embeds": [{"description": "У вас не найден второй аккаунт","color": 16711680}]}'
       account-unlinked: '{"embeds": [{"description": "Аккаунт успешно отвязан","color": 65280}]}'
+  change_nick:
+    group: 'change'
+    name: 'nick'
+    description: 'сменить игровой ник'
+    arguments:
+      nick:
+        rename: 'ник'
+        describe: 'укажите новый ник'
+    messages:
+      account-not-found: '{"embeds": [{"description": "Вы не зарегистрированны на игровом сервере","color": 16711680}]}'
+      change-cooldown: '{"embeds": [{"description": "Вы сможете снова сменить ник <t:${time}:R>","color": 16711680}]}'
+      nick-already-registered: '{"embeds": [{"description": "Аккаунт с указанным ником уже зарегистрирован на игровом сервере","color": 16711680}]}'
+      no-java-account: '{"embeds": [{"description": "Смена ника поддерживается только на Java редакции игры. Для смены ника Bedrock используйте Xbox аккаунт","color": 16711680}]}'
+      incorrect-java-nick: '{"embeds": [{"description": "Неверно указан новый ник","color": 16711680}]}'
+      # ${nick} - новый ник
+      nick-changed: '{"embeds": [{"description": "Ник изменен на **`${nick}`**","color": 65280}]}'
   shizotop:
     name: 'activity'
     group: 'top'
