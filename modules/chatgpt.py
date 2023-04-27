@@ -5,6 +5,7 @@ import asyncio, functools, typing
 from datetime import datetime
 from manager import DiscordManager
 from language import DiscordLanguage
+from string import Template
 def to_thread(func: typing.Callable) -> typing.Coroutine:
 	@functools.wraps(func)
 	async def wrapper(*args, **kwargs):
@@ -20,7 +21,7 @@ class DiscordChatGPT:
 		self.error_messages = error_messages
 		self.conversation_id = None
 		self.chatgpt = Chatbot(config={ "access_token":access_token })
-
+		self.last_error = None
 		self.blocked = False
 		self.delayed_questions = {}
 		self.last_answer_time = datetime.now().timestamp()
@@ -113,6 +114,15 @@ class DiscordChatGPT:
 				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_updatetoken']['messages']['error-on-token-update'])
 			await interaction.followup.send(content=content,embeds=embeds,ephemeral=True)
 
+		@DiscordLanguage.command
+		async def chatgpt_lasterror(interaction: discord.Interaction):
+			if self.last_error:
+				error = str(self.last_error)
+				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['chatgpt_lasterror']['messages']['last-error']).safe_substitute(error=error))
+			else:
+				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_lasterror']['messages']['no-last-error'])
+			await interaction.response.send_message(content=content,embeds=embeds,ephemeral=True)
+
 	async def create_conversation(self):
 		self.conversation_id = None
 		await self.get_answer('Привет, сразу поясняю как будет работать наше общение. Тебя добавили в чат и будут присылать тебе сообщения пользователей  в формате:\nникнейм: сообщение\nИногда в начале запроса будут встречаться пояснения как тебе следует отвечать')
@@ -183,9 +193,10 @@ class DiscordChatGPT:
 		async with message.channel.typing():
 			try:
 				answers = self.single_answer(message,await self.get_answer(self.single_question(message)))
-			except:
+			except Exception as e:
 				await asyncio.sleep(random.random()*2.5)
 				answers = [random.choice(self.error_messages)]
+				self.last_error = e
 			i = 0
 			for answer in answers:
 				if i==0 and random.random() < 0.33:
