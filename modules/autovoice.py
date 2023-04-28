@@ -21,7 +21,10 @@ class DiscordAutoVoice:
 					guild = self.bot.guild()
 					if data:=cursor.fetchone():
 						channel_deleted, channel_name, channel_id, overwrites = data
-						overwrites = self.overwrites_from_json(overwrites)
+						if overwrites:
+							overwrites = self.overwrites_from_json(overwrites)
+						else:
+							overwrites = {}
 					else:
 						channel_deleted, channel_name, overwrites = True, f'Чат {member.name}', {}
 
@@ -50,10 +53,11 @@ class DiscordAutoVoice:
 				for data in cursor.fetchall():
 					channel_id = data[0]
 					channel = guild.get_channel(channel_id)
-					if channel and len([member for member in channel.members if not member.bot]) <= 0:
-						overwrites = self.overwrites_to_json(channel.overwrites)
-						cursor.execute("UPDATE discord_voices SET channel_name=? , channel_deleted=TRUE, overwrites=? WHERE channel_id=?",(channel.name,overwrites,channel_id))
-						await channel.delete()
+					if channel:
+						if len([member for member in channel.members if not member.bot]) <= 0:
+							overwrites = self.overwrites_to_json(channel.overwrites)
+							cursor.execute("UPDATE discord_voices SET channel_name=? , channel_deleted=TRUE, overwrites=? WHERE channel_id=?",(channel.name,overwrites,channel_id))
+							await channel.delete()
 					else:
 						cursor.execute(f'UPDATE discord_voices SET channel_deleted=TRUE WHERE channel_id={channel_id}')			
 		self.check = check
