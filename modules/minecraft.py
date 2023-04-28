@@ -9,7 +9,7 @@ from manager import DiscordManager
 from language import DiscordLanguage
 
 class DiscordMinecraft:
-	def __init__(self, bot, category: int, channel: int, cooldown: int, registered_role: int,approved_time:int, disapproved_time: int,request_duration: int,exception_role: int,inactive_role: int, inactive_time: int,inactive_on_leave:bool,counter_enabled: bool, counter_format:str, counter_channels:int, check_every_seconds: int, web_host: str, web_login: str, web_password: str):
+	def __init__(self, bot, category: int, channel: int, cooldown: int, registered_role: int,approved_time:int, disapproved_time: int,request_duration: int,exception_role: int,inactive_role: int, inactive_time: int,inactive_on_leave:bool,counter_enabled: bool, counter_format:str, counter_channels:int, check_every_seconds: int, web_host: str, web_login: str, web_password: str, link_cooldown: int, nick_change_cooldown: int):
 		self.bot = bot
 		self.stages = yaml.load(open('verification.yml'), Loader=yaml.FullLoader)
 		self.category = category
@@ -22,6 +22,8 @@ class DiscordMinecraft:
 		self.counter_channels = counter_channels
 		self.counter_enabled = counter_enabled
 		self.disapproved_time = disapproved_time
+		self.link_cooldown = link_cooldown
+		self.nick_change_cooldown = nick_change_cooldown
 		self.request_duration = request_duration
 		self.approved_time = approved_time
 		self.inactive_on_leave = inactive_on_leave
@@ -30,7 +32,7 @@ class DiscordMinecraft:
 		self.webapi = MinecraftWebAPI(web_host, web_login,web_password)
 		
 		with self.bot.cursor() as cursor:
-			cursor.execute("CREATE TABLE IF NOT EXISTS mc_accounts (id UUID NOT NULL,nick CHAR(32) UNIQUE,discordid BIGINT UNIQUE NOT NULL,pseudonym CHAR(64),ip CHAR(36),first_join INT(11) DEFAULT UNIX_TIMESTAMP() NOT NULL,last_join INT(11) DEFAULT UNIX_TIMESTAMP() NOT NULL,time_played INT(11) DEFAULT 0 NOT NULL,last_server VARCHAR(32),timezone INT(2) DEFAULT 0 NOT NULL,chat_global BOOL NOT NULL DEFAULT TRUE,chat_local BOOL NOT NULL DEFAULT TRUE,chat_private BOOL NOT NULL DEFAULT TRUE,inactive BOOL NOT NULL DEFAULT FALSE, code INT(5), code_time INT(11), country VARCHAR(32) DEFAULT 'Unknown' NOT NULL,city VARCHAR(32) DEFAULT 'Unknown' NOT NULL,PRIMARY KEY (id))")
+			cursor.execute("CREATE TABLE IF NOT EXISTS mc_accounts (id UUID NOT NULL,nick CHAR(16) UNIQUE,discordid BIGINT UNIQUE NOT NULL,pseudonym CHAR(64),ip CHAR(36),first_join INT(11) DEFAULT UNIX_TIMESTAMP() NOT NULL,last_join INT(11) DEFAULT UNIX_TIMESTAMP() NOT NULL,time_played INT(11) DEFAULT 0 NOT NULL,last_server VARCHAR(32),timezone INT(2) DEFAULT 0 NOT NULL,chat_global BOOL NOT NULL DEFAULT TRUE,chat_local BOOL NOT NULL DEFAULT TRUE,chat_private BOOL NOT NULL DEFAULT TRUE,inactive BOOL NOT NULL DEFAULT FALSE, purged BOOL NOT NULL DEFAULT FALSE, code INT(5), code_time INT(11), country VARCHAR(32) DEFAULT 'Unknown' NOT NULL,city VARCHAR(32) DEFAULT 'Unknown' NOT NULL, operator BOOL NOT NULL DEFAULT FALSE,PRIMARY KEY (id))")
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_playerdata (id UUID NOT NULL, server VARCHAR(32) NOT NULL, playerdata LONGTEXT NOT NULL, advancements LONGTEXT NOT NULL, PRIMARY KEY (id,server), FOREIGN KEY(id) REFERENCES mc_accounts(id) ON DELETE CASCADE ON UPDATE CASCADE)")
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_playerstats (id UUID NOT NULL, stats LONGTEXT NOT NULL, PRIMARY KEY(id), FOREIGN KEY(id) REFERENCES mc_accounts(id) ON DELETE CASCADE ON UPDATE CASCADE)")
 
@@ -40,12 +42,19 @@ class DiscordMinecraft:
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_registrations_answers (id INT NOT NULL, stage TEXT NOT NULL, question TEXT NOT NULL, answer TEXT, FOREIGN KEY(id) REFERENCES mc_registrations(id) ON DELETE CASCADE)")
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_inactive_recovery (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL,messageid BIGINT NOT NULL, sended INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), approved BOOL NOT NULL DEFAULT FALSE, closed INT(11), close_reason TEXT, PRIMARY KEY(id), FOREIGN KEY(discordid) REFERENCES mc_accounts(discordid) ON DELETE CASCADE ON UPDATE CASCADE)")
 			
-			cursor.execute("CREATE TABLE IF NOT EXISTS mc_change_nickname (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL, nick CHAR(32), PRIMARY KEY (id))")
-			
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_referals (user BIGINT NOT NULL,referal BIGINT NOT NULL UNIQUE)")
 			
-			cursor.execute("CREATE TABLE IF NOT EXISTS LinkedPlayers (bedrockId BINARY(16) NOT NULL ,javaUniqueId BINARY(16) NOT NULL ,javaUsername VARCHAR(16) NOT NULL, bedrockUsername VARCHAR(17), PRIMARY KEY (bedrockId) , INDEX (bedrockId, javaUniqueId)) ENGINE = InnoDB")
-		
+			cursor.execute("CREATE TABLE IF NOT EXISTS LinkedPlayers (bedrockId BINARY(16) NOT NULL ,javaUniqueId BINARY(16) NOT NULL UNIQUE,javaUsername VARCHAR(16) NOT NULL UNIQUE, bedrockUsername VARCHAR(17), PRIMARY KEY (bedrockId), INDEX (bedrockId, javaUniqueId)) ENGINE = InnoDB")
+			cursor.execute("CREATE OR REPLACE TRIGGER LinkedPlayers_UPDATE AFTER UPDATE ON mc_accounts FOR EACH ROW UPDATE LinkedPlayers SET javaUniqueId=UNHEX(REPLACE(NEW.id, \'-\', \'\')), javaUsername=NEW.nick WHERE javaUniqueId=UNHEX(REPLACE(OLD.id, \'-\', \'\'))")
+			cursor.execute("CREATE OR REPLACE TRIGGER LinkedPlayers_DELETE AFTER DELETE ON mc_accounts FOR EACH ROW DELETE FROM LinkedPlayers WHERE javaUniqueId=UNHEX(REPLACE(OLD.id, \'-\', \'\'))")
+			
+			cursor.execute("CREATE TABLE IF NOT EXISTS mc_last_link (id BIGINT NOT NULL, time INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), PRIMARY KEY (id), FOREIGN KEY(id) REFERENCES mc_accounts(discordid) ON DELETE CASCADE ON UPDATE CASCADE)")
+			cursor.execute("CREATE OR REPLACE TRIGGER mc_last_link_UPDATE AFTER UPDATE ON LinkedPlayers FOR EACH ROW BEGIN IF NEW.javaUniqueId != OLD.javaUniqueId THEN INSERT INTO mc_last_link (id,time) VALUES((SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)),UNIX_TIMESTAMP()+?) ON DUPLICATE KEY UPDATE id=(SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)), time=UNIX_TIMESTAMP()+?; END IF; END",(self.link_cooldown,self.link_cooldown,))
+			cursor.execute("CREATE OR REPLACE TRIGGER mc_last_link_INSERT AFTER INSERT ON LinkedPlayers FOR EACH ROW INSERT INTO mc_last_link (id,time) VALUES((SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)),UNIX_TIMESTAMP()+?) ON DUPLICATE KEY UPDATE id=(SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)), time=UNIX_TIMESTAMP()+?",(self.link_cooldown,self.link_cooldown,))
+
+			cursor.execute("CREATE TABLE IF NOT EXISTS mc_last_nick_change (id BIGINT NOT NULL, time INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), PRIMARY KEY (id), FOREIGN KEY(id) REFERENCES mc_accounts(discordid) ON DELETE CASCADE ON UPDATE CASCADE)")
+			cursor.execute("CREATE OR REPLACE TRIGGER mc_last_nick_change_UPDATE AFTER UPDATE ON mc_accounts FOR EACH ROW BEGIN IF NEW.id != OLD.id THEN INSERT INTO mc_last_nick_change (id,time) VALUES(NEW.discordid,UNIX_TIMESTAMP()+?) ON DUPLICATE KEY UPDATE id=NEW.discordid, time=UNIX_TIMESTAMP()+?; END IF; END",(self.nick_change_cooldown,self.nick_change_cooldown,))
+
 		@DiscordLanguage.command
 		async def registration_startbuttons(interaction: discord.Interaction, java_label: str = None, java_color: app_commands.Choice[int] = None,bedrock_label: str = None, bedrock_color: app_commands.Choice[int] = None):
 			java_label = java_label[:80] if java_label else self.bot.language.commands['registration_startbuttons']['messages']['default-java-text']
@@ -148,7 +157,7 @@ class DiscordMinecraft:
 					return
 				cursor.execute(f'SELECT id FROM mc_registrations WHERE discordid={interaction.user.id} AND closed IS NULL')
 				if cursor.fetchone():
-					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['active-registration-exists'])
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['registration-exists'])
 					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
 				cursor.execute(f'SELECT closed+{self.cooldown} FROM mc_registrations WHERE discordid={interaction.user.id} AND closed+{self.cooldown} > UNIX_TIMESTAMP()')
@@ -179,7 +188,7 @@ class DiscordMinecraft:
 						return
 					cursor.execute(f'SELECT bedrockId FROM LinkedPlayers WHERE bedrockId=UNHEX(REPLACE(\'{uuid}\', \'-\', \'\'))')
 					if cursor.fetchone():
-						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['registration-exists'])
+						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['register']['messages']['nick-already-registered'])
 						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					if not nick.startswith("."):
@@ -236,6 +245,14 @@ class DiscordMinecraft:
 					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
 				id, nickname = data
+				
+				cursor.execute(f'SELECT time FROM mc_last_link WHERE id=? AND time>UNIX_TIMESTAMP()',(interaction.user.id,))
+				data = cursor.fetchone()
+				if data:
+					time = data[0]
+					content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['link']['messages']['link-cooldown']).safe_substitute(time=time))
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+					return
 				if nickname.startswith('.'):
 					bedrock_uuid, bedrock_nick = id, nickname
 					java_nick, java_uuid = nick, self.getJavaUUID(nick)
@@ -329,6 +346,47 @@ class DiscordMinecraft:
 						await interaction.response.edit_message(content=content,embeds=embeds,view=None)
 					else:
 						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+
+		@DiscordLanguage.command
+		async def change_nick(interaction: discord.Interaction, nick: str):
+			with self.bot.cursor() as cursor:
+				cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={interaction.user.id}')
+				data = cursor.fetchone()
+				if not data:
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['change_nick']['messages']['account-not-found'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+					return
+				previous_uuid = data[0]
+				if data[1].startswith("."):
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['change_nick']['messages']['no-java-account'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+					return
+				cursor.execute(f'SELECT time FROM mc_last_nick_change WHERE id=? AND time>UNIX_TIMESTAMP()',(interaction.user.id,))
+				data = cursor.fetchone()
+				if data:
+					time = data[0]
+					content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['change_nick']['messages']['change-cooldown']).safe_substitute(time=time))
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+					return
+				if not re.match("[A-Za-z_0-9]{3,16}", nick) is not None:
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['change_nick']['messages']['incorrect-java-nick'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+					return
+				uuid = self.getJavaUUID(nick)
+				cursor.execute(f'SELECT id FROM mc_accounts WHERE id=\'{uuid}\'')
+				if cursor.fetchone():
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['change_nick']['messages']['nick-already-registered'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+					return
+				cursor.execute(f'SELECT id FROM mc_registrations WHERE uuid=\'{uuid}\' AND closed IS NULL')
+				if cursor.fetchone():
+					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['change_nick']['messages']['nick-already-registered'])
+					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+					return
+
+				cursor.execute(f'UPDATE mc_accounts SET id = \'{uuid}\', nick = \'{nick}\', pseudonym=\'{nick}\' WHERE discordid={interaction.user.id}')
+				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['change_nick']['messages']['nick-changed']).safe_substitute(nick=nick))
+				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
 		@DiscordLanguage.command
 		async def shizotop(interaction: discord.Interaction, page: int = 1):
@@ -1082,7 +1140,7 @@ class DiscordMinecraft:
 			cursor.execute(f'INSERT INTO mc_inactive_recovery (discordid,messageid) VALUES ({member.id},{message.id})')
 
 	def bedrock_registration_modal(self):
-		moda_title = self.bot.language.commands['register']['messages']['registration-bedrock-modal-title']
+		modal_title = self.bot.language.commands['register']['messages']['registration-bedrock-modal-title']
 		modal = discord.ui.Modal(title=modal_title, custom_id = "registration_start_bedrock")
 		label = self.bot.language.commands['register']['messages']['registration-nick-input-label']
 		placeholder = self.bot.language.commands['register']['messages']['registration-nick-input-placeholder']
