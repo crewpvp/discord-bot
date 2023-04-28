@@ -593,7 +593,6 @@ commands:
     messages:
       referal-not-referal: '{"embeds": [{"description": "Вы не можете быть приглашены пользователем, который приглашён вами","color": 16711680}]}'
       nick-already-registered: '{"embeds": [{"description": "Данный аккаунт уже зарегистрирован на игровом сервере","color": 16711680}]}'
-      active-registration-exists: '{"embeds": [{"description": "У вас уже есть активная заявка на верификацию","color": 16711680}]}'
       referal-not-found: '{"embeds": [{"description": "Аккаунт, связанный с ником, который вы указали как пригласившего не найден","color": 16711680}]}'
       incorrect-bedrock-nick: '{"embeds": [{"description": "Недопустимый или несуществующий ник для создания Bedrock аккаунта","color": 16711680}]}'
       incorrect-java-nick: '{"embeds": [{"description": "Недопустимый ник для создания Java аккаунта","color": 16711680}]}'
@@ -606,7 +605,7 @@ commands:
       registration-started: '{"embeds": [{"description": "Регистрация начата, перейдите в канал [${channel_name}](${channel_link})","color": 65280}]}'
 
       registration-java-modal-title: 'Регистрация Java Edition'
-      registartion-bedrock-modal-title: 'Регистрация Bedrock Edition'
+      registration-bedrock-modal-title: 'Регистрация Bedrock Edition'
       registration-nick-input-label: 'Ваш никнейм'
       registration-nick-input-placeholder: 'Введите его сюда'
       registration-referal-input-label: 'Кто вас пригласил?'
