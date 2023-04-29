@@ -24,7 +24,6 @@ class DiscordChatGPT:
 		self.access_token = None
 		self.chatgpt = None
 
-		self.last_error = None
 		self.blocked = False
 		self.delayed_questions = {}
 		self.last_answer_time = datetime.now().timestamp()
@@ -115,14 +114,6 @@ class DiscordChatGPT:
 				self.save_data()
 			await interaction.followup.send(content=content,embeds=embeds,ephemeral=True)
 
-		@DiscordLanguage.command
-		async def chatgpt_lasterror(interaction: discord.Interaction):
-			if self.last_error:
-				error = str(self.last_error)
-				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['chatgpt_lasterror']['messages']['last-error']).safe_substitute(error=error))
-			else:
-				content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['chatgpt_lasterror']['messages']['no-last-error'])
-			await interaction.response.send_message(content=content,embeds=embeds,ephemeral=True)
 
 	async def create_conversation(self):
 		try:
@@ -131,8 +122,7 @@ class DiscordChatGPT:
 			self.conversation_id = self.chatgpt.conversation_id
 			self.save_data()
 			return True
-		except Exception as e:
-			self.last_error = e
+		except:
 			return None
 		
 	def save_data(self):
@@ -203,10 +193,9 @@ class DiscordChatGPT:
 		async with message.channel.typing():
 			try:
 				answers = self.single_answer(message,await self.get_answer(self.single_question(message)))
-			except Exception as e:
+			except:
 				await asyncio.sleep(random.random()*2.5)
 				answers = [random.choice(self.error_messages)]
-				self.last_error = e
 			i = 0
 			for answer in answers:
 				if i==0 and random.random() < 0.33:

@@ -195,13 +195,6 @@ commands:
     messages:
       token-updated: '{"embeds": [{"description": "Токен обновлен","color": 65280}]}'
       error-on-token-update: '{"embeds": [{"description": "Токен не был обновлен, проверьте что вы получили его [тут](https://chat.openai.com/api/auth/session)","color": 16711680}]}'
-  chatgpt_lasterror:
-    group: 'chatgpt'
-    name: 'lasterror'
-    description: 'получить причину последней ошибки'
-    messages:
-      last-error: '{"embeds": [{"description": "Текст последней ошибки: ```${error}```","color": 65280}]}'
-      no-last-error: '{"embeds": [{"description": "Ошибок не было","color": 16711680}]}'
   profile_age:
     name: 'age'
     description: 'установить/удалить возраст в профиле'
