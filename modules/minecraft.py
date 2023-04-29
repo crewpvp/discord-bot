@@ -40,9 +40,10 @@ class DiscordMinecraft:
 
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_registrations (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL,uuid UUID NOT NULL, nick CHAR(32) NOT NULL, referal BIGINT, channelid BIGINT UNIQUE, channel_deleted BOOL NOT NULL DEFAULT FALSE, messageid BIGINT UNIQUE, time INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), stage TEXT NOT NULL,sended INT(11), approved BOOL NOT NULL DEFAULT FALSE, closed INT(11), close_reason TEXT, PRIMARY KEY (id))")
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_registrations_answers (id INT NOT NULL, stage TEXT NOT NULL, question TEXT NOT NULL, answer TEXT, FOREIGN KEY(id) REFERENCES mc_registrations(id) ON DELETE CASCADE)")
+			
 			cursor.execute("CREATE TABLE IF NOT EXISTS mc_inactive_recovery (id INT NOT NULL AUTO_INCREMENT, discordid BIGINT NOT NULL,messageid BIGINT NOT NULL, sended INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), approved BOOL NOT NULL DEFAULT FALSE, closed INT(11), close_reason TEXT, PRIMARY KEY(id), FOREIGN KEY(discordid) REFERENCES mc_accounts(discordid) ON DELETE CASCADE ON UPDATE CASCADE)")
 			
-			cursor.execute("CREATE TABLE IF NOT EXISTS mc_referals (user BIGINT NOT NULL,referal BIGINT NOT NULL UNIQUE)")
+			cursor.execute("CREATE TABLE IF NOT EXISTS mc_referals (user BIGINT NOT NULL,referal BIGINT NOT NULL UNIQUE, FOREIGN KEY(referal) REFERENCES mc_accounts(discordid) ON DELETE CASCADE ON UPDATE CASCADE)")
 			
 			cursor.execute("CREATE TABLE IF NOT EXISTS LinkedPlayers (bedrockId BINARY(16) NOT NULL ,javaUniqueId BINARY(16) NOT NULL UNIQUE,javaUsername VARCHAR(16) NOT NULL UNIQUE, bedrockUsername VARCHAR(17), PRIMARY KEY (bedrockId), INDEX (bedrockId, javaUniqueId)) ENGINE = InnoDB")
 			cursor.execute("CREATE OR REPLACE TRIGGER LinkedPlayers_UPDATE AFTER UPDATE ON mc_accounts FOR EACH ROW UPDATE LinkedPlayers SET javaUniqueId=UNHEX(REPLACE(NEW.id, \'-\', \'\')), javaUsername=NEW.nick WHERE javaUniqueId=UNHEX(REPLACE(OLD.id, \'-\', \'\'))")
@@ -278,7 +279,8 @@ class DiscordMinecraft:
 						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 						return
 					cursor.execute(f'UPDATE mc_accounts SET id = \'{java_uuid}\', nick = \'{java_nick}\', pseudonym=\'{java_nick}\' WHERE discordid={interaction.user.id}')
-					# запрос к серверу
+					if (server:=await self.webapi.fetch_player(bedrock_nick)):
+						await self.webapi.send_signal(server,'link_account',str(bedrock_uuid))
 				else:
 					java_uuid, java_nick = id, nickname
 					if not re.match("^\.?[A-Za-z][A-Za-z0-9]{0,11}[0-9]{0,4}",nick) is not None:
@@ -340,7 +342,8 @@ class DiscordMinecraft:
 					cursor.execute(f'DELETE FROM LinkedPlayers WHERE javaUniqueId = UNHEX(REPLACE(\'{java_uuid}\', \'-\', \'\')) AND bedrockId = UNHEX(REPLACE(\'{bedrock_uuid}\', \'-\', \'\'))')
 					if environment == 0:
 						cursor.execute(f'UPDATE mc_accounts SET id=\'{bedrock_uuid}\', nick=\'{bedrock_nick}\', pseudonym=\'{bedrock_nick}\' WHERE id=\'{java_uuid}\'')
-						# запрос к серверу
+						if (server:=await self.webapi.fetch_player(java_nick)):
+							await self.webapi.send_signal(server,'unlink_account',str(java_uuid))
 					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['unlink']['messages']['account-unlinked'])
 					if interaction.message:
 						await interaction.response.edit_message(content=content,embeds=embeds,view=None)
@@ -356,8 +359,8 @@ class DiscordMinecraft:
 					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['change_nick']['messages']['account-not-found'])
 					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
-				previous_uuid = data[0]
-				if data[1].startswith("."):
+				previous_uuid,previous_nick = data
+				if previous_nick.startswith("."):
 					content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['change_nick']['messages']['no-java-account'])
 					await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 					return
@@ -385,6 +388,8 @@ class DiscordMinecraft:
 					return
 
 				cursor.execute(f'UPDATE mc_accounts SET id = \'{uuid}\', nick = \'{nick}\', pseudonym=\'{nick}\' WHERE discordid={interaction.user.id}')
+				if (server:=await self.webapi.fetch_player(previous_nick)):
+					await self.webapi.send_signal(server,'change_nick',str(previous_uuid))
 				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['change_nick']['messages']['nick-changed']).safe_substitute(nick=nick))
 				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
@@ -401,12 +406,12 @@ class DiscordMinecraft:
 			l = []
 			for nick,discordid,time_played in players:
 				user = interaction.guild.get_member(discordid)
-				nick = nick.replace('_','\\_')
+				nick = nick.replace('_','\\\\_')
 				if user:
 					user = Template(self.bot.language.commands['shizotop']['messages']['user-format']).safe_substitute(user=user.mention)
-					player = Template(self.bot.language.commands['shizotop']['messages']['player-format']).safe_substitute(user=user,time=relativeTimeParser(time_played),nick=nick)
+					player = Template(self.bot.language.commands['shizotop']['messages']['player-format']).safe_substitute(user=user,time=relativeTimeParser(seconds=time_played,greater=True),nick=nick)
 				else:
-					player = Template(self.bot.language.commands['shizotop']['messages']['player-format']).safe_substitute(user='',time=relativeTimeParser(time_played),nick=nick)
+					player = Template(self.bot.language.commands['shizotop']['messages']['player-format']).safe_substitute(user='',time=relativeTimeParser(seconds=time_played,greater=True),nick=nick)
 				l.append(player)
 			l = (self.bot.language.commands['shizotop']['messages']['join-by']).join(l)
 			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['shizotop']['messages']['shizo-list']).safe_substitute(players=l))
@@ -470,7 +475,7 @@ class DiscordMinecraft:
 			l = []
 			for nick,discordid,start_time,end_time,reason in players:
 				user = interaction.guild.get_member(discordid)
-				nick = nick.replace('_','\\_')
+				nick = nick.replace('_','\\\\_')
 				reason = Template(self.bot.language.commands['exceptions']['messages']['reason-format']).safe_substitute(reason=reason) if reason else ''
 				if user:
 					user = Template(self.bot.language.commands['exceptions']['messages']['user-format']).safe_substitute(user=user.mention)
@@ -495,7 +500,7 @@ class DiscordMinecraft:
 			l = []
 			for nick,discordid,count in players:
 				user = interaction.guild.get_member(discordid)
-				nick = nick.replace('_','\\_')
+				nick = nick.replace('_','\\\\_')
 				if user:
 					user = Template(self.bot.language.commands['referals_top']['messages']['user-format']).safe_substitute(user=user.mention)
 					player = Template(self.bot.language.commands['referals_top']['messages']['player-format']).safe_substitute(count=count,user=user,nick=nick)
@@ -521,7 +526,7 @@ class DiscordMinecraft:
 			l = []
 			for nick,discordid in players:
 				user = interaction.guild.get_member(discordid)
-				nick = nick.replace('_','\\_')
+				nick = nick.replace('_','\\\\_')
 				if user:
 					user = Template(self.bot.language.commands['referals_mine']['messages']['user-format']).safe_substitute(user=user.mention)
 					player = Template(self.bot.language.commands['referals_mine']['messages']['player-format']).safe_substitute(user=user,nick=nick)
@@ -866,16 +871,17 @@ class DiscordMinecraft:
 			# check exceptions
 			#
 			with self.bot.cursor() as cursor:
-				cursor.execute(f'SELECT a.discordid FROM mc_exceptions AS e JOIN mc_accounts AS a ON e.id=a.id WHERE e.end<UNIX_TIMESTAMP()')
+				cursor.execute(f'SELECT a.nick,a.id,a.discordid FROM mc_exceptions AS e JOIN mc_accounts AS a ON e.id=a.id WHERE e.end<UNIX_TIMESTAMP()')
 				users = cursor.fetchall()
 				if users:
 					cursor.execute(f'DELETE FROM mc_exceptions WHERE end<UNIX_TIMESTAMP()')
 					guild = self.bot.guild()
 					role = guild.get_role(self.exception_role)
-					# запрос к серверу
-					for discordid in users:
-						member = guild.get_member(discordid[0])
+					for nick,id,discordid in users:
+						member = guild.get_member(discordid)
 						if member:
+							if (server:=await self.webapi.fetch_player(nick)):
+								await self.webapi.send_signal(server,'unexceptioned',str(id))
 							await member.remove_roles(role)
 			#
 			# check registrations 
@@ -905,6 +911,13 @@ class DiscordMinecraft:
 		if self.inactive_on_leave:
 			async def member_remove(member: discord.Member):
 				with self.bot.cursor() as cursor:
+					cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={member.id}')
+					data = cursor.fetchone()
+					if not data:
+						return
+					id,nick = data
+					if (server:=await self.webapi.fetch_player(nick)):
+						await self.webapi.send_signal(server,'leaved',str(id))
 					cursor.execute(f'UPDATE mc_accounts SET mc_accounts.inactive=TRUE WHERE discordid={member.id}')
 			self.member_remove = member_remove
 
@@ -1089,6 +1102,11 @@ class DiscordMinecraft:
 			cursor.execute(f'UPDATE mc_inactive_recovery SET approved=TRUE,closed=UNIX_TIMESTAMP(),close_reason=\'Ваша заявка о восстановлении была одобрена\' WHERE discordid=\'{member.id}\' AND closed IS NULL AND approved IS FALSE')
 			await member.remove_roles(interaction.guild.get_role(self.inactive_role))
 			await member.add_roles(interaction.guild.get_role(self.registered_role))
+			cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={member.id}')
+			id,nick = cursor.fetchone()
+			if (server:=await self.webapi.fetch_player(nick)):
+				await self.webapi.send_signal(server,'inactive_remove',str(id))
+
 	async def create_inactive_recovery(self, member, answers: [str,...] = None):
 		with self.bot.cursor() as cursor:
 			cursor.execute(f'SELECT id, nick, time_played, first_join, last_join FROM mc_accounts WHERE discordid = {member.id}')
@@ -1199,11 +1217,12 @@ class DiscordMinecraft:
 				cursor.execute(f'INSERT INTO mc_exceptions (id,end,reason) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time},?) ON DUPLICATE KEY UPDATE end=end+{time}, reason=?',(reason,reason,))
 			else:
 				cursor.execute(f'INSERT INTO mc_exceptions (id,end) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time}) ON DUPLICATE KEY UPDATE end=end+{time}')
+			if (server:=await self.webapi.fetch_player(nick)):
+				await self.webapi.send_signal(server,'exceptioned',str(id))
 			if(member:=self.bot.guild().get_member(data[0])):
 				await member.add_roles(self.bot.guild().get_role(self.exception_role))
 				return member
 			return True
-		# запрос на сервер	
 	async def remove_exception(self, nick: str):
 		id = self.getJavaUUID(nick) if not nick.startswith('.') else getBedrockUUID(nick)
 		if not id:
@@ -1212,9 +1231,10 @@ class DiscordMinecraft:
 			cursor.execute(f'SELECT a.discordid FROM mc_exceptions AS e JOIN mc_accounts AS a on a.id=e.id WHERE e.id=\'{id}\'')
 			if (data:=cursor.fetchone()):
 				cursor.execute(f'DELETE FROM mc_exceptions WHERE id=\'{id}\'')
+				if (server:=await self.webapi.fetch_player(nick)):
+					await self.webapi.send_signal(server,'unexceptioned',str(id))
 				if(member:=self.bot.guild().get_member(data[0])):
 					await member.remove_roles(self.bot.guild().get_role(self.exception_role))
 					return member
 				return True
-				# запрос на сервер
 		return False
