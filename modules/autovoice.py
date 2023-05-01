@@ -30,7 +30,7 @@ class DiscordAutoVoice:
 
 					if channel_deleted:
 						category = guild.get_channel(self.category)	
-						overwrites[member] = discord.PermissionOverwrite(manage_channels=True)
+						overwrites[member] = discord.PermissionOverwrite(manage_channels=True,manage_permissions=True,mute_members=True,move_members=True)
 						
 						channel = await guild.create_voice_channel(category=category,overwrites=overwrites, name=channel_name,position=500)
 						cursor.execute(f'INSERT INTO discord_voices (discordid,channel_id,channel_name) VALUES (?,?,?) ON DUPLICATE KEY UPDATE channel_id=?, created_time=UNIX_TIMESTAMP(), channel_deleted=FALSE',(member.id,channel.id,channel_name,channel.id,))
