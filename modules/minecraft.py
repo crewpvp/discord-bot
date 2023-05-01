@@ -80,6 +80,36 @@ class DiscordMinecraft:
 			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
 
 		@DiscordLanguage.command
+		async def registration_authorizebutton(interaction: discord.Interaction, label: str = None, color: app_commands.Choice[int] = None):
+			label = label[:80] if label else self.bot.language.commands['registration_authorizebutton']['messages']['default-button-text']
+			color = discord.ButtonStyle(color.value) if color else discord.ButtonStyle(2)
+			view = discord.ui.View(timeout=None)
+			view.add_item(discord.ui.Button(disabled=False,custom_id="authorize",label=label,style=color))
+			await interaction.channel.send(view=view)
+			content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['registration_authorizebutton']['messages']['button-created'])
+			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+
+		@DiscordLanguage.command
+		async def registration_authcodebutton(interaction: discord.Interaction, label: str = None, color: app_commands.Choice[int] = None):
+			label = label[:80] if label else self.bot.language.commands['registration_authcodebutton']['messages']['default-button-text']
+			color = discord.ButtonStyle(color.value) if color else discord.ButtonStyle(2)
+			view = discord.ui.View(timeout=None)
+			view.add_item(discord.ui.Button(disabled=False,custom_id="authcode",label=label,style=color))
+			await interaction.channel.send(view=view)
+			content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['registration_authcodebutton']['messages']['button-created'])
+			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+
+		@DiscordLanguage.command
+		async def registration_logoutbutton(interaction: discord.Interaction, label: str = None, color: app_commands.Choice[int] = None):
+			label = label[:80] if label else self.bot.language.commands['registration_logoutbutton']['messages']['default-button-text']
+			color = discord.ButtonStyle(color.value) if color else discord.ButtonStyle(2)
+			view = discord.ui.View(timeout=None)
+			view.add_item(discord.ui.Button(disabled=False,custom_id="logout",label=label,style=color))
+			await interaction.channel.send(view=view)
+			content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['registration_logoutbutton']['messages']['button-created'])
+			await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+
+		@DiscordLanguage.command
 		async def recovery(interaction: discord.Interaction):
 			with self.bot.cursor() as cursor:
 				cursor.execute(f'SELECT id FROM mc_accounts WHERE discordid={interaction.user.id} AND inactive=TRUE')
@@ -542,6 +572,12 @@ class DiscordMinecraft:
 				customid = interaction.data['custom_id']
 				if customid == "inactive_recovery_start":
 					await recovery.callback(interaction)
+				elif customid == "authorize":
+					await authorize.callback(interaction)
+				elif customid == "authcode":
+					await authcode.callback(interaction)
+				elif customid == "logout":
+					await logout.callback(interaction)
 				elif customid == "inactive_recovery_approve":
 					with self.bot.cursor() as cursor:
 						cursor.execute(f'SELECT discordid FROM mc_inactive_recovery WHERE messageid={interaction.message.id}')

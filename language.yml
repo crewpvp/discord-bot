@@ -481,6 +481,60 @@ commands:
     messages:
       default-button-text: 'Восстановить аккаунт'
       button-created: '{"embeds": [{"description": "Кнопка начала восстановления аккаунта создана","color": 65280}]}'
+  registration_authorizebutton:
+    group: 'registration'
+    name: 'authorizebutton'
+    description: 'Создать кнопку авторизации на сервере'
+    arguments:
+      color:
+        rename: 'цвет'
+        choices:
+          'синяя': 1
+          'серая': 2
+          'зеленая': 3
+          'красная': 4
+      label:
+        rename: 'название'
+        description: 'максимальная длина 80 символов'
+    messages:
+      default-button-text: 'Авторизоваться'
+      button-created: '{"embeds": [{"description": "Кнопка авторизации создана","color": 65280}]}'
+  registration_authcodebutton:
+    group: 'registration'
+    name: 'authcodebutton'
+    description: 'Создать кнопку создания одноразового кода для входа'
+    arguments:
+      color:
+        rename: 'цвет'
+        choices:
+          'синяя': 1
+          'серая': 2
+          'зеленая': 3
+          'красная': 4
+      label:
+        rename: 'название'
+        description: 'максимальная длина 80 символов'
+    messages:
+      default-button-text: 'Код для входа'
+      button-created: '{"embeds": [{"description": "Кнопка создания одноразового кода для входа создана","color": 65280}]}'
+  registration_logoutbutton:
+    group: 'registration'
+    name: 'logoutbutton'
+    description: 'Создать кнопку выхода из аккаунта'
+    arguments:
+      color:
+        rename: 'цвет'
+        choices:
+          'синяя': 1
+          'серая': 2
+          'зеленая': 3
+          'красная': 4
+      label:
+        rename: 'название'
+        description: 'максимальная длина 80 символов'
+    messages:
+      default-button-text: 'Выйти из аккаунта'
+      button-created: '{"embeds": [{"description": "Кнопка выхода из аккаунта создана","color": 65280}]}'
   recovery:
     name: 'recovery'
     description: 'восстановить аккаунт'
