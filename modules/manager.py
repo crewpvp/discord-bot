@@ -4,14 +4,15 @@ from utils import json_to_message, message_to_json
 from discord.ext import commands
 
 class Manager(commands.Cog):
-	def __init__(self,bot):
+	def __init__(self,bot,guild_object):
 		self.bot = bot
-		self.bot.tree.add_command(app_commands.ContextMenu(name='Получить JSON',callback=self.context_message_view))
+		self.bot.tree.add_command(app_commands.ContextMenu(name='Получить JSON',callback=self.context_messages_view),guild=guild_object)
 
 	messages_group = app_commands.Group(name='messages', description='Менеджер сообщений')
 	
 	@messages_group.command(name='send', description='отправить сообщение из JSON')
 	@app_commands.describe(json='сообщение в формате JSON')
+	@app_commands.checks.has_permissions(manage_messages=True)
 	async def messages_send(self,interaction: discord.Interaction, json: str):
 		try:
 			content, reference, embeds, components = json_to_message(json)
@@ -39,6 +40,7 @@ class Manager(commands.Cog):
 	
 	@messages_group.command(name='purge', description='очистить сообщения')
 	@app_commands.rename(limit='количество')
+	@app_commands.checks.has_permissions(manage_messages=True)
 	async def messages_purge(self, interaction: discord.Interaction, limit: int, author: discord.Member = None):
 		await interaction.response.defer(ephemeral=True)
 		limit = abs(limit)
@@ -51,6 +53,6 @@ class Manager(commands.Cog):
 		embed = discord.Embed(description='Сообщения очищены',color=discord.Colour.green())
 		await interaction.followup.send(embed=embed,ephemeral=True)
 
-	async def context_message_view(self, interaction: discord.Interaction, message: discord.Message):
-		await self.message_view.callback(interaction,str(message.id))
+	async def context_messages_view(self, interaction: discord.Interaction, message: discord.Message):
+		await self.messages_view.callback(self,interaction,str(message.id))
 	
