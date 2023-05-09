@@ -12,7 +12,7 @@ class AutoVoice(commands.Cog):
 
 	@commands.Cog.listener()
 	async def on_ready(self):
-		async with await self.bot.cursor() as cursor:
+		async with self.bot.cursor() as cursor:
 			await cursor.execute("CREATE TABLE IF NOT EXISTS discord_voices (discordid BIGINT NOT NULL, created_time INT(11) DEFAULT UNIX_TIMESTAMP(), channel_id BIGINT UNIQUE, channel_deleted BOOLEAN DEFAULT FALSE, channel_name CHAR(100), overwrites TEXT, PRIMARY KEY (discordid))")
 		self.voice_check.start()
 
@@ -23,7 +23,7 @@ class AutoVoice(commands.Cog):
 	async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
 		if after.channel == None or member.bot:
 			return
-		async with await self.bot.cursor() as cursor:
+		async with self.bot.cursor() as cursor:
 			if after.channel.id == self.channel:
 				await cursor.execute(f'SELECT channel_deleted, channel_name, channel_id, overwrites FROM discord_voices WHERE discordid={member.id}')
 				guild = self.bot.guild()
@@ -53,7 +53,7 @@ class AutoVoice(commands.Cog):
 
 	async def voice_check(self):
 		guild = self.bot.guild()
-		async with await self.bot.cursor() as cursor:
+		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT channel_id FROM discord_voices WHERE channel_deleted = FALSE AND created_time+{self.lifetime}<UNIX_TIMESTAMP()')
 			for data in await cursor.fetchall():
 				channel_id = data[0]
@@ -69,7 +69,7 @@ class AutoVoice(commands.Cog):
 	async def on_voice_check_cancel(self):
 		if not self.voice_check.is_being_cancelled():
 			return
-		async with await self.bot.cursor() as cursor:
+		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT channel_id FROM discord_voices WHERE channel_deleted = FALSE')
 			for data in await cursor.fetchall():
 				channel_id = data[0]
