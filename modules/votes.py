@@ -139,38 +139,22 @@ class Votes(commands.Cog):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT id,channelid,start,end,placeholder FROM discord_votes WHERE end<UNIX_TIMESTAMP()')
 			votes = await cursor.fetchall()
-			if votes:
-				for id, channelid, start_time, end_time, placeholder in votes:
-					message = await self.bot.guild().get_channel(channelid).fetch_message(id)
-					if message:
-						
-						values = []
-						labels = []
-						descriptions = []
+			if not votes:
+				return
+			for id, channelid, start_time, end_time, placeholder in votes:
+				if not (channel:= self.bot.guild().get_channel(channelid)):
+					continue
+				if not (message:= await channel.fetch_message(id)):
+					continue
 
-						await cursor.execute(f'SELECT value,label,description FROM discord_votes_values WHERE id={id}')
-						for value, label, description in await cursor.fetchall():
-							labels.insert(value,label)
-							values.insert(value,0)
-							if description:
-								descriptions.insert(value,description)
-							else:
-								descriptions.insert(value,None)
+				embed = discord.Embed(title='Результаты голосования',description=f'Начато <t:{start_time}:f>\nЗавершено <t:{end_time}:f>', color=discord.Colour.green())
+				await cursor.execute(f'SELECT COUNT(a.value),v.label,v.description FROM discord_votes_values AS v LEFT JOIN discord_votes_answers AS a ON v.id=a.id AND a.value=v.value WHERE v.id={id} GROUP by v.value')
+				for amount, label, description in await cursor.fetchall():
+					if description:
+						embed.add_field(name=f'{label} ({description})',value=f'Голосов: **{amount}**')
+					else:
+						embed.add_field(name=f'{label}',value=f'Голосов: **{amount}**')
+				await message.edit(embed=embed,view=None)
 
-						await cursor.execute(f'SELECT value FROM discord_votes_answers WHERE id={id}')
-						answers = cursor.fetchall()
-						if answers:
-							for value in answers:
-								values[value[0]]+=1
-
-						embed = discord.Embed(title='Результаты голосования',description=f'Начато в <t:{start_time}:f>\nЗавершено в <t:{end_time}:f>', color=discord.Colour.green())
-						for i in range(len(labels)):
-							label, description,amount = labels[i],descriptions[i],values[i]
-							if description:
-								embed.add_field(name=f'{label} ({description})',value=f'Количество голосов: {amount}')
-							else:
-								embed.add_field(name=f'{label}',value=f'Количество голосов: {amount}')
-						await message.edit(embed=embed,view=None)
-
-				await cursor.execute(f'DELETE FROM discord_votes WHERE end<UNIX_TIMESTAMP()')
+			await cursor.execute(f'DELETE FROM discord_votes WHERE end<UNIX_TIMESTAMP()')
 	
