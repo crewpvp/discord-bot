@@ -8,7 +8,7 @@ class Votes(commands.Cog):
 		self.bot = bot
 		self.vote_roles = vote_roles
 		self.check_every_seconds = check_every_seconds
-		self.vote_check = tasks.loop(seconds=self.check_every_seconds)(self.vote_check)
+		self.vote_check = tasks.loop(seconds=self.check_every_seconds)(self.on_vote_check)
 
 	@commands.Cog.listener()
 	async def on_ready(self):
@@ -135,7 +135,7 @@ class Votes(commands.Cog):
 		embed = discord.Embed(description='Ваш голос записан. Вы сможете изменить его до конца голосования.',color=discord.Colour.green())
 		await interaction.response.send_message(embed=embed, ephemeral=True)
 
-	async def vote_check(self):
+	async def on_vote_check(self):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT id,channelid,start,end,placeholder FROM discord_votes WHERE end<UNIX_TIMESTAMP()')
 			votes = await cursor.fetchall()

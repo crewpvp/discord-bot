@@ -8,7 +8,7 @@ class AutoVoice(commands.Cog):
 		self.channel = channel
 		self.category = category
 		self.lifetime = lifetime
-		self.voice_check = tasks.loop(seconds=self.lifetime)(self.voice_check)
+		self.voice_check = tasks.loop(seconds=self.lifetime)(self.on_voice_check)
 		self.voice_check.after_loop(self.on_voice_check_cancel)
 
 	@commands.Cog.listener()
@@ -31,7 +31,7 @@ class AutoVoice(commands.Cog):
 				if data:= await cursor.fetchone():
 					channel_deleted, channel_name, channel_id, overwrites = data
 					if overwrites:
-						overwrites = overwrites_from_json(overwrites)
+						overwrites = overwrites_from_json(guild,overwrites)
 					else:
 						overwrites = {}
 				else:
@@ -52,7 +52,7 @@ class AutoVoice(commands.Cog):
 				else:
 					await cursor.execute(f'UPDATE discord_voices SET created_time=UNIX_TIMESTAMP() WHERE channel_id={after.channel.id}')	
 
-	async def voice_check(self):
+	async def on_voice_check(self):
 		guild = self.bot.guild()
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT channel_id FROM discord_voices WHERE channel_deleted = FALSE AND created_time+{self.lifetime}<UNIX_TIMESTAMP()')
@@ -70,6 +70,7 @@ class AutoVoice(commands.Cog):
 	async def on_voice_check_cancel(self):
 		if not self.voice_check.is_being_cancelled():
 			return
+		guild = self.bot.guild()
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT channel_id FROM discord_voices WHERE channel_deleted = FALSE')
 			for data in await cursor.fetchall():

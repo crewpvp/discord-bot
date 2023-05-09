@@ -129,7 +129,7 @@ def json_to_message(message: str):
 		pass
 	return content, reference, embeds, view
 
-def overwrites_to_json(self,overwrites):
+def overwrites_to_json(overwrites):
 	json_list = []
 	for key in overwrites:
 		if isinstance(key, discord.Role):
@@ -140,9 +140,8 @@ def overwrites_to_json(self,overwrites):
 			json_list.append({'type':1,'id':key.id,'allow':pair[0].value,'deny':pair[1].value})
 	return json.dumps(json_list,indent=0,ensure_ascii=False)
 	
-def overwrites_from_json(self,stored_overwrites: str):
+def overwrites_from_json(guild: discord.Guild ,stored_overwrites: str):
 	overwrites = {}
-	guild = self.bot.guild()
 	for overwrite in json.loads(stored_overwrites):
 		if overwrite['type']==0:
 			subject = guild.get_role(overwrite['id'])
