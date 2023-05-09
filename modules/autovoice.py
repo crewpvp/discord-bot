@@ -1,5 +1,6 @@
 import discord, json
 from discord.ext import commands, tasks
+from utils import overwrites_from_json, overwrites_to_json
 
 class AutoVoice(commands.Cog):
 	def __init__(self, bot, channel: int, category: int, lifetime: int):
@@ -30,7 +31,7 @@ class AutoVoice(commands.Cog):
 				if data:= await cursor.fetchone():
 					channel_deleted, channel_name, channel_id, overwrites = data
 					if overwrites:
-						overwrites = self.overwrites_from_json(overwrites)
+						overwrites = overwrites_from_json(overwrites)
 					else:
 						overwrites = {}
 				else:
@@ -60,7 +61,7 @@ class AutoVoice(commands.Cog):
 				channel = guild.get_channel(channel_id)
 				if channel:
 					if len([member for member in channel.members if not member.bot]) <= 0:
-						overwrites = self.overwrites_to_json(channel.overwrites)
+						overwrites = overwrites_to_json(channel.overwrites)
 						await cursor.execute(f'UPDATE discord_voices SET channel_name=%s , channel_deleted=TRUE, overwrites=%s WHERE channel_id={channel_id}',(channel.name,overwrites,))
 						await channel.delete()
 				else:
@@ -74,33 +75,11 @@ class AutoVoice(commands.Cog):
 			for data in await cursor.fetchall():
 				channel_id = data[0]
 				channel = guild.get_channel(channel_id)
-				if channel:
-					overwrites = self.overwrites_to_json(channel.overwrites)
+				if channel: 
+					overwrites = overwrites_to_json(channel.overwrites)
 					await cursor.execute(f'UPDATE discord_voices SET channel_name=%s , channel_deleted=TRUE, overwrites=%s WHERE channel_id={channel_id}',(channel.name,overwrites,))
 					await channel.delete()
 				else:
 					await cursor.execute(f'UPDATE discord_voices SET channel_deleted=TRUE WHERE channel_id={channel_id}')
 
-	def overwrites_to_json(self,overwrites):
-		json_list = []
-		for key in overwrites:
-			if isinstance(key, discord.Role):
-				pair = overwrites[key].pair()
-				json_list.append({'type':0,'id':key.id,'allow':pair[0].value,'deny':pair[1].value})
-			elif isinstance(key, discord.Member):
-				pair = overwrites[key].pair()
-				json_list.append({'type':1,'id':key.id,'allow':pair[0].value,'deny':pair[1].value})
-		return json.dumps(json_list,indent=0,ensure_ascii=False)
 	
-	def overwrites_from_json(self,stored_overwrites: str):
-		overwrites = {}
-		guild = self.bot.guild()
-		for overwrite in json.loads(stored_overwrites):
-			if overwrite['type']==0:
-				subject = guild.get_role(overwrite['id'])
-			else:
-				subject = guild.get_member(overwrite['id'])
-			if not subject:
-				continue
-			overwrites[subject] = discord.PermissionOverwrite.from_pair(discord.Permissions(permissions=overwrite['allow']),discord.Permissions(permissions=overwrite['deny']))
-		return overwrites
