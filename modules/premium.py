@@ -46,7 +46,7 @@ class Premium(commands.Cog):
 			embed = discord.Embed(description=f'{member.mention} не имеет премиума',color=discord.Colour.red())
 		else:
 			embed = discord.Embed(description=f'{member.mention} лишен премиума',color=discord.Colour.green())
-		await interaction.response.send_message(pembed=embed,ephemeral=True)
+		await interaction.response.send_message(embed=embed,ephemeral=True)
 	
 	@premiums_group.command(name='synchronize', description='синхронизировать роли премиума у пользователей c БД')
 	async def premiums_synchronize(self, interaction: discord.Interaction):
