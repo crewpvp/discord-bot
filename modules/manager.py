@@ -44,15 +44,14 @@ class Manager(commands.Cog):
 	async def messages_purge(self, interaction: discord.Interaction, limit: int, author: discord.Member = None):
 		await interaction.response.defer(ephemeral=True)
 		limit = abs(limit)
-		limit = 100 if limit > 100 else limit
+		embed = discord.Embed(description='Чистка запущена',color=discord.Colour.green())
+		await interaction.followup.send(embed=embed,ephemeral=True)
 		async for message in interaction.channel.history(limit=limit):
 			if not author:
 				await message.delete()
 				continue
 			if message.author == author:
 				await message.delete()
-		embed = discord.Embed(description='Сообщения очищены',color=discord.Colour.green())
-		await interaction.followup.send(embed=embed,ephemeral=True)
 
 	async def context_messages_view(self, interaction: discord.Interaction, message: discord.Message):
 		await self.messages_view.callback(self,interaction,str(message.id))
