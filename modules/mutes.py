@@ -1,105 +1,140 @@
+import discord,random
 from discord import app_commands
-from discord.ext import tasks
-import discord
-from datetime import datetime
-from modules.utils import relativeTimeParser
-import random
-from string import Template
-from manager import DiscordManager
-from language import DiscordLanguage
-class DiscordMutes:
+from discord.ext import commands,tasks
+from utils import relativeTimeParser
+
+class Mutes(commands.Cog):
 	def __init__(self, bot, muted_role: int, check_every_seconds: int, images: [str,...] = []):
 		self.bot = bot
 		self.muted_role = muted_role
 		self.images = images
+
 		self.check_every_seconds = check_every_seconds
-
-		with self.bot.cursor() as cursor:
-			cursor.execute("CREATE TABLE IF NOT EXISTS discord_isolator (discordid BIGINT NOT NULL, start INT(11) DEFAULT UNIX_TIMESTAMP(), end INT(11), isolated BOOL NOT NULL, time INT(11) NOT NULL DEFAULT 0, reason TEXT, CONSTRAINT PRIMARY KEY(discordid))")
-		
-		@DiscordLanguage.command
-		async def mute(interaction: discord.Interaction, member: discord.Member, days: float = 1.0, reason: str = None):
-			await self.mute(member,reason,days=days)
-			reason = Template(self.bot.language.commands['mute']['messages']['reason']).safe_substitute(reason=reason) if reason else ''
-			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['mute']['messages']['user-muted']).safe_substitute(reason=reason,user=member.mention,time=relativeTimeParser(days=days)))
-			if self.images and embeds:
-				embeds[0].set_image(url=random.choice(self.images))
-			await interaction.response.send_message(content=content,embeds=embeds)
-
-		@DiscordLanguage.command
-		async def unmute(interaction: discord.Interaction, member: discord.Member):
-			if await self.unmute(member):
-				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['unmute']['messages']['user-unmuted']).safe_substitute(user=member.mention))
-				await interaction.response.send_message(content=content,embeds=embeds)
-			else:
-				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['unmute']['messages']['user-not-muted']).safe_substitute(user=member.mention))
-				await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
-				
-		@DiscordLanguage.command
-		async def isolator(interaction: discord.Interaction, page: int = None):
-			page = 0 if not page or page < 1 else page-1
-			with self.bot.cursor() as cursor:
-				cursor.execute(f'SELECT discordid,end,reason FROM discord_isolator WHERE isolated=TRUE ORDER BY start DESC LIMIT {page*5},5 ')
-				buinie = cursor.fetchall()
-				cursor.execute(f'SELECT count(*) FROM discord_isolator WHERE isolated=TRUE')
-				count = cursor.fetchone()[0]
-			if buinie:
-				mutes = []
-				mute_id = count-(page*5)
-				for discordid,time,reason in buinie:
-					member = interaction.guild.get_member(discordid)
-					if member:
-						reason = Template(self.bot.language.commands['isolator']['messages']['reason']).safe_substitute(reason=reason) if reason else ''
-						mutes.append(Template(self.bot.language.commands['isolator']['messages']['mute-format']).safe_substitute(reason=reason,user=member.mention,time=time,id=mute_id))
-					mute_id-=1
-				if mutes:
-					mutes = (self.bot.language.commands['isolator']['messages']['join-by']).join(mutes)
-					content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['isolator']['messages']['mute-list']).safe_substitute(mutes=mutes, count=count, page=page+1))
-					await interaction.response.send_message(content=content,embeds=embeds,ephemeral=False)
-					return
-
-			content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['isolator']['messages']['empty-mute-list'])
-			await interaction.response.send_message(content=content,embeds=embeds,ephemeral=True)
-		
-		async def member_join(member: discord.Member):
-			with self.bot.cursor() as cursor:
-				cursor.execute(f'SELECT discordid FROM discord_isolator WHERE discordid={member.id} AND isolated=TRUE')
-				if cursor.fetchone():
-					role = self.bot.guild().get_role(self.muted_role)
-					await member.add_roles(role)
-
-		self.member_join = member_join
+		self.mutes_check = tasks.loop(seconds=self.check_every_seconds)(self.on_mutes_check)
 	
-		async def check(num):
-			if (num % self.check_every_seconds != 0):
-				return
-			with self.bot.cursor() as cursor:
-				cursor.execute(f'SELECT discordid FROM discord_isolator WHERE end<UNIX_TIMESTAMP() AND isolated=TRUE')
-				users = cursor.fetchall()
-				if users:
-					cursor.execute(f'UPDATE discord_isolator SET time=time+end-start,reason=null, isolated=FALSE, start=null, end=null WHERE end<UNIX_TIMESTAMP() AND isolated=TRUE')
-					guild = self.bot.guild()
-					role = guild.get_role(self.muted_role)
-					for discordid in users:
-						member = guild.get_member(discordid[0])
-						if member:
-							await member.remove_roles(role)
-		self.check = check
+	@commands.Cog.listener()
+	async def on_ready(self):
+		async with self.bot.cursor() as cursor:
+			await cursor.execute("CREATE TABLE IF NOT EXISTS discord_isolator (discordid BIGINT NOT NULL, start INT(11) DEFAULT UNIX_TIMESTAMP(), end INT(11), isolated BOOL NOT NULL, time INT(11) NOT NULL DEFAULT 0, reason TEXT, CONSTRAINT PRIMARY KEY(discordid))")
+		await self.sync_roles()
+		self.mutes_check.start()
 
-	async def mute(self, member: discord.Member, reason: str = None, seconds: int = 0, minutes: int = 0, hours: int = 0, days: int = 0, years: int = 0):
-		time = seconds+(minutes*60)+(hours*3600)+(days*86400)+(years*31536000)
-		with self.bot.cursor() as cursor:
-			if reason:
-				cursor.execute(f'INSERT INTO discord_isolator (discordid,end,reason,isolated) VALUES ({member.id},UNIX_TIMESTAMP()+{time},?,TRUE) ON DUPLICATE KEY UPDATE isolated=TRUE, end=IF(end is null,UNIX_TIMESTAMP()+{time},end+{time}), start=IF(start is null,UNIX_TIMESTAMP(),start), reason=?',(reason,reason,))
+	def cog_unload(self):
+		self.mutes_check.cancel()
+
+	@app_commands.command(name='mute',description='выдать буйного на определенный срок')
+	@app_commands.rename(member='пользователь',days='длительность',reason='причина')
+	@app_commands.describe(days='количество дней буйного (поддерживает дробные значения)')
+	async def mute(self,interaction: discord.Interaction, member: discord.Member, days: float = 1.0, reason: str = None):
+		await self.mute_member(member,reason=reason,days=days)
+		time=relativeTimeParser(days=days)
+		if reason:
+			embed = discord.Embed(description=f'{member.mention} доставлен в изолятор на срок {time} по причине {reason}',color=discord.Colour.green())
+		else:
+			embed = discord.Embed(description=f'{member.mention} доставлен в изолятор на срок {time}',color=discord.Colour.green())
+		if self.images:
+			embed.set_image(url=random.choice(self.images))
+		await interaction.response.send_message(embed=embed)
+
+	@app_commands.command(name='unmute',description='помиловать раба божьего')
+	@app_commands.rename(member='пользователь')
+	async def unmute(self,interaction: discord.Interaction, member: discord.Member):
+		if await self.unmute_member(member):
+			embed = discord.Embed(description=f'{member.mention} отпустили все совершенные ранее грехи',color=discord.Colour.green())
+			await interaction.response.send_message(embed=embed)
+		else:
+			embed = discord.Embed(description=f'{member.mention} не имеет ни единого греха',color=discord.Colour.red())
+			await interaction.response.send_message(embed=embed, ephemeral=True)
+			
+	@app_commands.command(name='isolator',description='список буйных, время заточения в дурке и причины')
+	@app_commands.rename(page='страница')
+	async def isolator(self,interaction: discord.Interaction, page: int = None):
+		page = 0 if not page or page < 1 else page-1
+		async with self.bot.cursor() as cursor:
+			await cursor.execute(f'SELECT discordid,end,reason FROM discord_isolator WHERE isolated=TRUE ORDER BY start DESC LIMIT {page*5},5 ')
+			muted_users = await cursor.fetchall()
+			await cursor.execute(f'SELECT count(*) FROM discord_isolator WHERE isolated=TRUE')
+			count = (await cursor.fetchone())[0]
+		if muted_users:
+			mute_id = count-(page*5)
+			embed = discord.Embed(title='Состояние изолятора', description=f'Вот они, легенды комьюнити.\nВсего: {count}',color=discord.Colour.green())
+			not_empty = False
+			for discordid,time,reason in muted_users:
+				if (member:= interaction.guild.get_member(discordid)):
+					not_empty = True
+					if reason:
+						embed.add_field(name=f'Пациент \#{mute_id}',value=f'{member.mention} **будет выпущен** <t:{time}:R>\nПричина изоляции: {reason}',inline=False)
+					else:
+						embed.add_field(name=f'Пациент \#{mute_id}',value=f'{member.mention} **будет выпущен** <t:{time}:R>',inline=False)
+				mute_id-=1
+			if not_empty:
+				await interaction.response.send_message(embed=embed,ephemeral=False)
+				return
+		embed = discord.Embed(description='Изолятор пуст, жаль.',color=discord.Colour.red())
+		await interaction.response.send_message(embed=embed,ephemeral=True)
+	
+	mutes_group = app_commands.Group(name='mutes', description='Управление мутом пользователей')
+
+	@mutes_group.command(name='synchronize', description='синхронизировать роли буйных у пользователей c БД')
+	async def mutes_synchronize(self, interaction: discord.Interaction):
+		embed = discord.Embed(description='Синхронизация буйных с БД запущена',color=discord.Colour.green())
+		await interaction.response.send_message(embed=embed,ephemeral=True)
+		await self.sync_roles()
+
+	async def sync_roles(self):
+		guild = self.bot.guild()
+		role = guild.get_role(self.muted_role)
+		async with self.bot.cursor() as cursor:
+			await cursor.execute(f'SELECT discordid FROM discord_isolator WHERE isolated=TRUE')
+			users = await cursor.fetchall()
+		users = [id[0] for id in users] if users else []
+		for member in role.members:
+			fetched = None
+			for i in range(len(users)):
+				if member.id == users[i]:
+					fetched = i
+			if fetched != None:
+				users.pop(fetched)
 			else:
-				cursor.execute(f'INSERT INTO discord_isolator (discordid,end,isolated) VALUES ({member.id},UNIX_TIMESTAMP()+{time},TRUE) ON DUPLICATE KEY UPDATE isolated=TRUE, end=IF(end is null,UNIX_TIMESTAMP()+{time},end+{time}), start=IF(start is null,UNIX_TIMESTAMP(),start)')
+				await member.remove_roles(role)
+		for id in users:
+			if (member:= guild.get_member(id)):
+				await member.add_roles(role)
+
+	@commands.Cog.listener()
+	async def on_member_join(self,member: discord.Member):
+		async with self.bot.cursor() as cursor:
+			await cursor.execute(f'SELECT discordid FROM discord_isolator WHERE discordid={member.id} AND isolated=TRUE')
+			if await cursor.fetchone():
+				role = self.bot.guild().get_role(self.muted_role)
+				await member.add_roles(role)
+	
+	async def on_mutes_check(self):
+		async with self.bot.cursor() as cursor:
+			await cursor.execute(f'SELECT discordid FROM discord_isolator WHERE end<UNIX_TIMESTAMP() AND isolated=TRUE')
+			users = await cursor.fetchall()
+			if users:
+				await cursor.execute(f'UPDATE discord_isolator SET time=time+end-start,reason=null, isolated=FALSE, start=null, end=null WHERE end<UNIX_TIMESTAMP() AND isolated=TRUE')
+				guild = self.bot.guild()
+				role = guild.get_role(self.muted_role)
+				for discordid in users:
+					if (member:=guild.get_member(discordid[0])):
+						await member.remove_roles(role)
+
+	async def mute_member(self, member: discord.Member, reason: str = None, seconds: int = 0, minutes: int = 0, hours: int = 0, days: int = 0, years: int = 0):
+		time = seconds+(minutes*60)+(hours*3600)+(days*86400)+(years*31536000)
+		async with self.bot.cursor() as cursor:
+			if reason:
+				await cursor.execute(f'INSERT INTO discord_isolator (discordid,end,reason,isolated) VALUES ({member.id},UNIX_TIMESTAMP()+{time},%s,TRUE) ON DUPLICATE KEY UPDATE isolated=TRUE, end=IF(end is null,UNIX_TIMESTAMP()+{time},end+{time}), start=IF(start is null,UNIX_TIMESTAMP(),start), reason=%s',(reason,reason,))
+			else:
+				await cursor.execute(f'INSERT INTO discord_isolator (discordid,end,isolated) VALUES ({member.id},UNIX_TIMESTAMP()+{time},TRUE) ON DUPLICATE KEY UPDATE isolated=TRUE, end=IF(end is null,UNIX_TIMESTAMP()+{time},end+{time}), start=IF(start is null,UNIX_TIMESTAMP(),start)')
 		await member.add_roles(self.bot.guild().get_role(self.muted_role))
 			
-	async def unmute(self, member: discord.Member):
+	async def unmute_member(self, member: discord.Member):
 		await member.remove_roles(self.bot.guild().get_role(self.muted_role))
-		with self.bot.cursor() as cursor:
-			cursor.execute(f'SELECT discordid FROM discord_isolator WHERE discordid={member.id} AND isolated=TRUE')
-			if cursor.fetchone():
-				cursor.execute(f'UPDATE discord_isolator SET time=time+end-start, reason=null, isolated=FALSE, start=null, end=null WHERE discordid={member.id}')
+		async with self.bot.cursor() as cursor:
+			await cursor.execute(f'SELECT discordid FROM discord_isolator WHERE discordid={member.id} AND isolated=TRUE')
+			if await cursor.fetchone():
+				await cursor.execute(f'UPDATE discord_isolator SET time=time+end-start, reason=null, isolated=FALSE, start=null, end=null WHERE discordid={member.id}')
 				return True
 		return False
