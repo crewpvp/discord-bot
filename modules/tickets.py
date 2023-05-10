@@ -156,7 +156,7 @@ class Tickets(commands.Cog):
 				embed = discord.Embed(description=f'Тикет принят, перейдите в [канал]({channel_link})',color=discord.Colour.green())
 				try:
 					notify_embed = discord.Embed(title='Система тикетов',description=f'Ваш тикет был принят, перейдите в [канал]({channel_link})',color=discord.Colour.green())
-					await ticket_member.send(embed=embed)
+					await ticket_member.send(embed=notify_embed)
 				except:
 					pass
 			else:
