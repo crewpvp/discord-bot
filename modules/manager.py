@@ -4,9 +4,9 @@ from utils import json_to_message, message_to_json
 from discord.ext import commands
 
 class Manager(commands.Cog):
-	def __init__(self,bot,guild_object):
+	def __init__(self,bot):
 		self.bot = bot
-		self.bot.tree.add_command(app_commands.ContextMenu(name='Получить JSON',callback=self.context_messages_view),guild=guild_object)
+		self.bot.tree.add_command(app_commands.ContextMenu(name='Получить JSON',callback=self.context_messages_view),guild=self.bot.guild_object())
 
 	messages_group = app_commands.Group(name='messages', description='Менеджер сообщений')
 	
