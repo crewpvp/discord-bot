@@ -1,5 +1,5 @@
 from discord import app_commands
-import discord,re,requests,uuid,random,yaml
+import discord,re,requests,uuid,random,yaml,aiohttp
 from datetime import datetime
 from modules.utils import relativeTimeParser
 from manager import DiscordManager
@@ -7,6 +7,56 @@ from modules.MinecraftWebAPI import MinecraftWebAPI
 from string import Template
 from manager import DiscordManager
 from language import DiscordLanguage
+
+class MinecraftWebAPI:
+	def __init__(self, host: str, login: str, password: str):
+		self.host = host
+		self.auth = aiohttp.BasicAuth(login, password)
+
+	async def get_servers(self, online: bool = True) -> tuple[str,...] | None:
+		async with aiohttp.ClientSession() as session:
+			params = {'online':str(online).lower()}
+			try:
+				async with session.get(url=self.host+'/servers',auth=self.auth,params=params) as response:
+					return await response.json()
+			except:
+				return None
+  
+	async def fetch_player(self, nick: str) -> str | None:
+		async with aiohttp.ClientSession() as session:
+			try:
+				async with session.get(url=self.host+f'/player/{nick}',auth=self.auth) as response:
+					return await response.json() if response.status == 200 else None
+			except:
+				return None
+
+	async def get_players(self, *servers: str) ->  tuple[str,...] | None:
+		async with aiohttp.ClientSession() as session:
+			try:
+				params = {'server':servers} if servers else None
+				async with session.get(url=self.host+f'/players',auth=self.auth, params=params) as response:
+					return await response.json() if response.status == 200 else None
+			except:
+				return None
+
+	async def send_command(self, server:str, command: str) -> bool:
+		async with aiohttp.ClientSession() as session:
+			try:
+				async with session.get(url=self.host+f'/server/{server}/command?{command}',auth=self.auth) as response:
+					return True if response.status==200 else False 
+			except:
+				return False
+  
+	async def send_signal(self, server: str,key: str, value: str = None) -> bool:
+		async with aiohttp.ClientSession() as session:
+	 		try: 
+				if value:
+					resp = await session.get(url=self.host+f'/server/{server}/signal?key={key}&value={value}',auth=self.auth)
+				else:
+					resp = await session.get(url=self.host+f'/server/{server}/signal?key={key}',auth=self.auth)
+				return True if resp.status==200 else False 
+			except:
+				return False
 
 class DiscordMinecraft:
 	def __init__(self, bot, category: int, channel: int, cooldown: int, registered_role: int,approved_time:int, disapproved_time: int,request_duration: int,exception_role: int,inactive_role: int, inactive_time: int,inactive_on_leave:bool,counter_enabled: bool, counter_format:str, counter_channels:int, check_every_seconds: int, web_host: str, web_login: str, web_password: str, link_cooldown: int, nick_change_cooldown: int):
@@ -247,8 +297,8 @@ class DiscordMinecraft:
 					return
 				category = interaction.guild.get_channel(self.category)
 				overwrites = {
-				    interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-				    interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+					interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+					interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True)
 				}
 				channel = await interaction.guild.create_text_channel(name=nick[1:] if nick.startswith('.') else nick,category=category, overwrites=overwrites)
 				start_stage = self.stages['start_stage']
@@ -970,30 +1020,30 @@ class DiscordMinecraft:
 			return member.id
 		return None
 	def getBedrockUUID(self, gamertag: str):
-	    gamertag = gamertag[1:] if gamertag.startswith('.') else gamertag
-	    try:
-	        gamertag = int(requests.get(f'https://api.geysermc.org/v2/xbox/xuid/{gamertag}').text[8:-1])
-	    except:
-	        return None
-	    if len(str(gamertag)) > 16:
-	        return None
-	    left = hex(gamertag)[2:]
-	    decades = [12,4,4,4,8]
-	    final = ['00000000','0000','0000','0000','000000000000']
-	    for i in range(5):
-	        l = len(left)
-	        s = l-decades[i]
-	        if s>0:
-	            left,right = left[:s],left[s:]
-	            final[4-i] = right
-	        else:
-	            final[4-i]= final[i][l:] + left
-	            break
-	    return '-'.join(final)
+		gamertag = gamertag[1:] if gamertag.startswith('.') else gamertag
+		try:
+			gamertag = int(requests.get(f'https://api.geysermc.org/v2/xbox/xuid/{gamertag}').text[8:-1])
+		except:
+			return None
+		if len(str(gamertag)) > 16:
+			return None
+		left = hex(gamertag)[2:]
+		decades = [12,4,4,4,8]
+		final = ['00000000','0000','0000','0000','000000000000']
+		for i in range(5):
+			l = len(left)
+			s = l-decades[i]
+			if s>0:
+				left,right = left[:s],left[s:]
+				final[4-i] = right
+			else:
+				final[4-i]= final[i][l:] + left
+				break
+		return '-'.join(final)
 	def getJavaUUID(self,nickname: str):
-	    class NULL_NAMESPACE:
-	        bytes = b''
-	    return uuid.uuid3(NULL_NAMESPACE, "OfflinePlayer:"+nickname)
+		class NULL_NAMESPACE:
+			bytes = b''
+		return uuid.uuid3(NULL_NAMESPACE, "OfflinePlayer:"+nickname)
 	
 	def parseQuestions(self, stage:str):
 		stage = self.stages['stages'][stage]
