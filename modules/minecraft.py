@@ -1,11 +1,8 @@
-import discord,re,requests,uuid,random,yaml,aiohttp
+import discord,re,uuid,random,yaml,aiohttp
 from discord import app_commands
 from discord.ext import commands,tasks
 from datetime import datetime
-from modules.utils import relativeTimeParser
-from string import Template
-from manager import DiscordManager
-from language import DiscordLanguage
+from utils import relativeTimeParser,json_to_message
 
 class MinecraftWebAPI:
 	def __init__(self, host: str, login: str, password: str):
@@ -48,7 +45,7 @@ class MinecraftWebAPI:
   
 	async def send_signal(self, server: str,key: str, value: str = None) -> bool:
 		async with aiohttp.ClientSession() as session:
-	 		try: 
+			try: 
 				if value:
 					resp = await session.get(url=self.host+f'/server/{server}/signal?key={key}&value={value}',auth=self.auth)
 				else:
@@ -58,27 +55,25 @@ class MinecraftWebAPI:
 				return False
 
 class Minecraft(commands.Cog):
-	def __init__(self, bot, category: int, channel: int, cooldown: int, registered_role: int,approved_time:int, disapproved_time: int,request_duration: int,exception_role: int,inactive_role: int, inactive_time: int,inactive_on_leave:bool,counter_enabled: bool, counter_format:str, counter_channels:int, check_every_seconds: int, web_host: str, web_login: str, web_password: str, link_cooldown: int, nick_change_cooldown: int):
+	def __init__(self, bot, category: int, channel: int, cooldown: int, registered_role: int,approved_time:int, disapproved_time: int,request_duration: int,exception_role: int,inactive: {}, counter: {}, check_every_seconds: int, web_host: str, web_login: str, web_password: str, link_cooldown: int, nick_change_cooldown: int):
 		self.bot = bot
 		self.stages = yaml.load(open('verification.yml'), Loader=yaml.FullLoader)
 		self.category = category
 		self.channel = channel
 		self.cooldown = cooldown
-		self.inactive_role = inactive_role
 		self.registered_role = registered_role
-		self.inactive_time = inactive_time
-		self.counter_format = counter_format
-		self.counter_channels = counter_channels
-		self.counter_enabled = counter_enabled
+		self.inactive = inactive
+		self.counter = counter
 		self.disapproved_time = disapproved_time
 		self.link_cooldown = link_cooldown
 		self.nick_change_cooldown = nick_change_cooldown
 		self.request_duration = request_duration
 		self.approved_time = approved_time
-		self.inactive_on_leave = inactive_on_leave
 		self.check_every_seconds = check_every_seconds
 		self.exception_role = exception_role
 		self.webapi = MinecraftWebAPI(web_host, web_login,web_password)
+
+		self.check = tasks.loop(seconds=self.check_every_seconds)(self.on_check)
 	
 	@commands.Cog.listener()
 	async def on_ready(self):
@@ -101,30 +96,41 @@ class Minecraft(commands.Cog):
 			await cursor.execute("CREATE OR REPLACE TRIGGER LinkedPlayers_DELETE AFTER DELETE ON mc_accounts FOR EACH ROW DELETE FROM LinkedPlayers WHERE javaUniqueId=UNHEX(REPLACE(OLD.id, \'-\', \'\'))")
 			
 			await cursor.execute("CREATE TABLE IF NOT EXISTS mc_last_link (id BIGINT NOT NULL, time INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), PRIMARY KEY (id), FOREIGN KEY(id) REFERENCES mc_accounts(discordid) ON DELETE CASCADE ON UPDATE CASCADE)")
-			await cursor.execute("CREATE OR REPLACE TRIGGER mc_last_link_UPDATE AFTER UPDATE ON LinkedPlayers FOR EACH ROW BEGIN IF NEW.javaUniqueId != OLD.javaUniqueId THEN INSERT INTO mc_last_link (id,time) VALUES((SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)),UNIX_TIMESTAMP()+?) ON DUPLICATE KEY UPDATE id=(SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)), time=UNIX_TIMESTAMP()+?; END IF; END",(self.link_cooldown,self.link_cooldown,))
-			await cursor.execute("CREATE OR REPLACE TRIGGER mc_last_link_INSERT AFTER INSERT ON LinkedPlayers FOR EACH ROW INSERT INTO mc_last_link (id,time) VALUES((SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)),UNIX_TIMESTAMP()+?) ON DUPLICATE KEY UPDATE id=(SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)), time=UNIX_TIMESTAMP()+?",(self.link_cooldown,self.link_cooldown,))
+			await cursor.execute(f'CREATE OR REPLACE TRIGGER mc_last_link_UPDATE AFTER UPDATE ON LinkedPlayers FOR EACH ROW BEGIN IF NEW.javaUniqueId != OLD.javaUniqueId THEN INSERT INTO mc_last_link (id,time) VALUES((SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)),UNIX_TIMESTAMP()+{self.link_cooldown}) ON DUPLICATE KEY UPDATE id=(SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)), time=UNIX_TIMESTAMP()+{self.link_cooldown}; END IF; END')
+			await cursor.execute(f'CREATE OR REPLACE TRIGGER mc_last_link_INSERT AFTER INSERT ON LinkedPlayers FOR EACH ROW INSERT INTO mc_last_link (id,time) VALUES((SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)),UNIX_TIMESTAMP()+{self.link_cooldown}) ON DUPLICATE KEY UPDATE id=(SELECT discordid FROM mc_accounts WHERE id=HEX(NEW.javaUniqueId)), time=UNIX_TIMESTAMP()+{self.link_cooldown}')
 
 			await cursor.execute("CREATE TABLE IF NOT EXISTS mc_last_nick_change (id BIGINT NOT NULL, time INT(11) NOT NULL DEFAULT UNIX_TIMESTAMP(), PRIMARY KEY (id), FOREIGN KEY(id) REFERENCES mc_accounts(discordid) ON DELETE CASCADE ON UPDATE CASCADE)")
-			await cursor.execute("CREATE OR REPLACE TRIGGER mc_last_nick_change_UPDATE AFTER UPDATE ON mc_accounts FOR EACH ROW BEGIN IF NEW.id != OLD.id THEN INSERT INTO mc_last_nick_change (id,time) VALUES(NEW.discordid,UNIX_TIMESTAMP()+?) ON DUPLICATE KEY UPDATE id=NEW.discordid, time=UNIX_TIMESTAMP()+?; END IF; END",(self.nick_change_cooldown,self.nick_change_cooldown,))
+			await cursor.execute(f'CREATE OR REPLACE TRIGGER mc_last_nick_change_UPDATE AFTER UPDATE ON mc_accounts FOR EACH ROW BEGIN IF NEW.id != OLD.id THEN INSERT INTO mc_last_nick_change (id,time) VALUES(NEW.discordid,UNIX_TIMESTAMP()+{self.nick_change_cooldown}) ON DUPLICATE KEY UPDATE id=NEW.discordid, time=UNIX_TIMESTAMP()+{self.nick_change_cooldown}; END IF; END')
+		await self.sync_roles()
+		self.check.start()
+
+	def cog_unload(self):
+		self.check.cancel()
 
 	minecraft_group = app_commands.Group(name='minecraft', description='управление модулем')
 
-	registration_group = app_commands.Group(name='registration', parent=minecraft_group)
-	recovery_group = app_commands.Group(name='recovery', parent=minecraft_group)
+	registration_group = app_commands.Group(name='registration', parent=minecraft_group, description='управление регистрациями')
+	recovery_group = app_commands.Group(name='recovery', parent=minecraft_group, description='управление восстановлением аккаунтов')
 
-	registration_authorize_group = app_commands.Group(name='authorize', parent=registration_group)
-	registration_authcode_group = app_commands.Group(name='authcode', parent=registration_group)
-	registration_logout_group = app_commands.Group(name='logout', parent=registration_group)
+	registration_authorize_group = app_commands.Group(name='authorize', parent=minecraft_group, description='создание кнопок')
+	registration_authcode_group = app_commands.Group(name='authcode', parent=minecraft_group, description='создание кнопок')
+	registration_logout_group = app_commands.Group(name='logout', parent=minecraft_group, description='создание кнопок')
 
-	exception_group = app_commands.Group(name='exception',parent=minecraft_group)
-	unexception_group = app_commands.Group(name='unexception',parent=minecraft_group)
+	exception_group = app_commands.Group(name='exception',parent=minecraft_group, description='управление исключениями')
+	unexception_group = app_commands.Group(name='unexception',parent=minecraft_group, description='управление исключениями')
 
 	top_group = app_commands.Group(name='top', description='Все возможные игровые топы')
 	change_group = app_commands.Group(name='change', description='Изменить данные игрового аккаунта')
 
+	@minecraft_group.command(name='synchronize', description='синхронизировать роли у пользователей c БД')
+	async def minecraft_synchronize(self, interaction: discord.Interaction):
+		embed = discord.Embed(description='Синхронизация ролей с БД запущена',color=discord.Colour.green())
+		await interaction.response.send_message(embed=embed,ephemeral=True)
+		await self.sync_roles()
+
 	@registration_group.command(name='accept',description='одобрить заявку на регистрацию аккаунта')
 	@app_commands.rename(id='номер_заявки')
-	async def registration_accept(self,interaction: discord.Interaction, id: int)
+	async def registration_accept(self,interaction: discord.Interaction, id: int):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT discordid, nick, uuid, channelid, referal, messageid FROM mc_registrations WHERE id={id} AND closed IS NULL')
 			if not (data:=await cursor.fetchone()):
@@ -153,12 +159,13 @@ class Minecraft(commands.Cog):
 								await premium.add_premium(member=referal,days=7)
 
 				try:
-					await member.remove_roles(interaction.guild.get_role(self.inactive_role))
+					await member.remove_roles(interaction.guild.get_role(self.inactive['role']))
 					await member.add_roles(interaction.guild.get_role(self.registered_role))
 				except:
 					pass
 				if message:
 					embed = message.embeds[0]
+					embed.colour = discord.Colour.green()
 					time = int(datetime.now().timestamp())
 					embed.add_field(name=f'Одобрено <t:{time}:R>',value=f'{interaction.user.mention}')
 					await message.edit(content=None,view=None,embed=embed)
@@ -183,6 +190,7 @@ class Minecraft(commands.Cog):
 				await cursor.execute(f'UPDATE mc_registrations SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE id={id}')
 				if message:
 					embed = message.embeds[0]
+					embed.colour = discord.Colour.red()
 					time = int(datetime.now().timestamp())
 					embed.add_field(name=f'Отклонено <t:{time}:R>',value='Автор заявки покинул Discord сервер')
 					await message.edit(content=None,view=None,embed=embed)
@@ -195,7 +203,7 @@ class Minecraft(commands.Cog):
 
 	@registration_group.command(name='decline',description='отклонить заявку на регистрацию игрового аккаунта')
 	@app_commands.rename(id='номер_заявки',reason='причина')
-	async def registration_decline(self,interaction: discord.Interaction, id: int, reason: str)
+	async def registration_decline(self,interaction: discord.Interaction, id: int, reason: str):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT discordid,channelid,messageid FROM mc_registrations WHERE id={id}')
 			if not (data:=await cursor.fetchone()):
@@ -214,6 +222,7 @@ class Minecraft(commands.Cog):
 				await cursor.execute(f'UPDATE mc_inactive_recovery SET closed=UNIX_TIMESTAMP(), close_reason = %s WHERE id={id}', (reason,))
 				if message:
 					embed = message.embeds[0]
+					embed.colour = discord.Colour.red()
 					time = int(datetime.now().timestamp())
 					embed.add_field(name=f'Отклонено <t:{time}:R>',value=f'{interaction.user.mention} по причине {reason}')
 					await message.edit(content=None,view=None,embed=embed)
@@ -239,6 +248,7 @@ class Minecraft(commands.Cog):
 				await cursor.execute(f'UPDATE mc_registrations SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE id={id}')
 				if message:
 					embed = message.embeds[0]
+					embed.colour = discord.Colour.red()
 					time = int(datetime.now().timestamp())
 					embed.add_field(name=f'Отклонено <t:{time}:R>',value='Автор заявки покинул Discord сервер')
 					await message.edit(content=None,view=None,embed=embed)
@@ -252,7 +262,7 @@ class Minecraft(commands.Cog):
 	
 	@recovery_group.command(name='accept',description='одобрить восстановление игрового аккаунта')
 	@app_commands.rename(id='номер_заявки')
-	async def recovery_accept(self,interaction: discord.Interaction, id: int)
+	async def recovery_accept(self,interaction: discord.Interaction, id: int):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT discordid,messageid FROM mc_inactive_recovery WHERE id={id} AND closed IS NULL')
 			if not (data:=await cursor.fetchone()):
@@ -269,12 +279,13 @@ class Minecraft(commands.Cog):
 				await cursor.execute(f'UPDATE mc_accounts SET inactive=FALSE, last_join=UNIX_TIMESTAMP() WHERE discordid={member.id}')
 				await cursor.execute(f'UPDATE mc_inactive_recovery SET approved=TRUE,closed=UNIX_TIMESTAMP(),close_reason=\'Ваша заявка о восстановлении была одобрена\' WHERE messageid={id}')
 				try:
-					await member.remove_roles(interaction.guild.get_role(self.inactive_role))
+					await member.remove_roles(interaction.guild.get_role(self.inactive['role']))
 					await member.add_roles(interaction.guild.get_role(self.registered_role))
 				except:
 					pass
 				if message:
 					embed = message.embeds[0]
+					embed.colour = discord.Colour.green()
 					time = int(datetime.now().timestamp())
 					embed.add_field(name=f'Одобрено <t:{time}:R>',value=f'{interaction.user.mention}')
 					await message.edit(content=None,view=None,embed=embed)
@@ -291,6 +302,7 @@ class Minecraft(commands.Cog):
 				await cursor.execute(f'UPDATE mc_inactive_recovery SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE id={id}')
 				if message:
 					embed = message.embeds[0]
+					embed.colour = discord.Colour.red()
 					time = int(datetime.now().timestamp())
 					embed.add_field(name=f'Отклонено <t:{time}:R>',value='Автор заявки покинул Discord сервер')
 					await message.edit(content=None,view=None,embed=embed)
@@ -299,7 +311,7 @@ class Minecraft(commands.Cog):
 
 	@recovery_group.command(name='decline',description='отклонить восстановление игрового аккаунта')
 	@app_commands.rename(id='номер_заявки',reason='причина')
-	async def recovery_decline(self,interaction: discord.Interaction, id: int, reason: str)
+	async def recovery_decline(self,interaction: discord.Interaction, id: int, reason: str):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT discordid,messageid FROM mc_inactive_recovery WHERE id={id} AND closed IS NULL')
 			if not (data:=await cursor.fetchone()):
@@ -317,6 +329,7 @@ class Minecraft(commands.Cog):
 				await cursor.execute(f'UPDATE mc_inactive_recovery SET closed=UNIX_TIMESTAMP(), close_reason = %s WHERE id={id}',(reason,))
 				if message:
 					embed = message.embeds[0]
+					embed.colour = discord.Colour.red()
 					time = int(datetime.now().timestamp())
 					embed.add_field(name=f'Отклонено <t:{time}:R>',value=f'{interaction.user.mention} по причине {reason}')
 					await message.edit(content=None,view=None,embed=embed)
@@ -332,6 +345,7 @@ class Minecraft(commands.Cog):
 				await cursor.execute(f'UPDATE mc_inactive_recovery SET closed=UNIX_TIMESTAMP(), close_reason = \'Заявка автоматически отклонена в связи с покиданием Discord сервера\' WHERE id={id}')
 				if message:
 					embed = message.embeds[0]
+					embed.colour = discord.Colour.red()
 					time = int(datetime.now().timestamp())
 					embed.add_field(name=f'Отклонено <t:{time}:R>',value='Автор заявки покинул Discord сервер')
 					await message.edit(content=None,view=None,embed=embed)
@@ -357,7 +371,7 @@ class Minecraft(commands.Cog):
 	@recovery_group.command(name='button',description='Создать кнопку восстановления аккаунта')
 	@app_commands.rename(label='название',color='цвет')
 	@app_commands.choices(color=[app_commands.Choice(name=name,value=value) for name,value in (('синяя',1),('серая',2),('зеленая',3),('красная',4))])
-	async def registration_recovery_button(self, interaction: discord.Interaction, label: str = None, color: app_commands.Choice[int] = None):
+	async def recovery_button(self, interaction: discord.Interaction, label: str = None, color: app_commands.Choice[int] = None):
 		label = label[:80] if label else 'Восстановить аккаунт'
 		color = discord.ButtonStyle(color.value) if color else discord.ButtonStyle(2)
 		view = discord.ui.View(timeout=None)
@@ -417,7 +431,7 @@ class Minecraft(commands.Cog):
 				return
 			await interaction.response.send_modal(self.recovery_modal())
 					
-	@app_commands.command(name='authroize',description='авторизовать аккаунт на игровом сервере')
+	@app_commands.command(name='authorize',description='авторизовать аккаунт на игровом сервере')
 	async def authorize(self, interaction: discord.Interaction):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={interaction.user.id}')
@@ -435,11 +449,11 @@ class Minecraft(commands.Cog):
 		embed = discord.Embed(description='Вы успешно авторизованны!',color=discord.Colour.green())
 		await interaction.response.send_message(embed=embed, ephemeral=True)
 		
-	@app_commands.command(name='authroize',description='выйти с аккаунта на игровом сервере')
+	@app_commands.command(name='logout',description='выйти с аккаунта на игровом сервере')
 	async def logout(self, interaction: discord.Interaction):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT id,nick,ip FROM mc_accounts WHERE discordid={interaction.user.id}')
-			data = cursor.fetchone()
+			data = await cursor.fetchone()
 			if not data:
 				embed = discord.Embed(description='Вы не зарегистрированны на игровом сервере',color=discord.Colour.red())
 				await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -516,7 +530,7 @@ class Minecraft(commands.Cog):
 					await interaction.response.send_message(embed=embed, ephemeral=True)
 					return
 				await cursor.execute(f'SELECT bedrockId FROM LinkedPlayers WHERE bedrockId=UNHEX(REPLACE(\'{uuid}\', \'-\', \'\'))')
-				if cursor.fetchone():
+				if await cursor.fetchone():
 					embed = discord.Embed(description='Данный аккаунт уже зарегистрирован на игровом сервере',color=discord.Colour.red())
 					await interaction.response.send_message(embed=embed, ephemeral=True)
 					return
@@ -562,7 +576,7 @@ class Minecraft(commands.Cog):
 	@app_commands.command(name='link',description='привязать второй аккаунт')
 	@app_commands.rename(nick='ник')
 	async def link(self, interaction: discord.Interaction, nick: str):
-		await with self.bot.cursor() as cursor:
+		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={interaction.user.id}')
 			data = await cursor.fetchone()
 			if not data:
@@ -637,7 +651,7 @@ class Minecraft(commands.Cog):
 			embed = discord.Embed(description=f'Аккаунт успешно привязан',color=discord.Colour.green())
 			await interaction.response.send_message(embed=embed, ephemeral=True)
 
-	@app_commands.command(name='link',description='отвязать второй аккаунт')
+	@app_commands.command(name='unlink',description='отвязать второй аккаунт')
 	@app_commands.rename(environment='редакция_игры')
 	@app_commands.choices(environment=[app_commands.Choice(name=name,value=value) for name,value in (('Java Edition',0),('Bedrock Edition',1))])
 	async def unlink(self,interaction: discord.Interaction, environment: app_commands.Choice[int] = None):
@@ -767,7 +781,7 @@ class Minecraft(commands.Cog):
 			return
 		await self.exception_nick.callback(self,interaction=interaction,nick=data[0],days=days,reason=reason)
 		
-	@unexception_group.command(name='member',description='снять все грехи с малого по нику')
+	@unexception_group.command(name='nick',description='снять все грехи с малого по нику')
 	@app_commands.rename(nick='игровой_ник')
 	async def unexception_nick(self, interaction: discord.Interaction, nick: str):
 		user = await self.remove_exception(nick=nick)
@@ -974,29 +988,35 @@ class Minecraft(commands.Cog):
 		elif interaction.type == discord.InteractionType.modal_submit:
 			customid = interaction.data['custom_id']
 			if customid == "inactive_recovery_submit":
-				with self.bot.cursor() as cursor:
-					cursor.execute(f'SELECT id FROM mc_inactive_recovery WHERE discordid=\'{interaction.user.id}\' AND closed IS NULL')
+				async with self.bot.cursor() as cursor:
+					await cursor.execute(f'SELECT id FROM mc_inactive_recovery WHERE discordid={interaction.user.id} AND closed IS NULL')
 					if not cursor.fetchone():
-						with self.bot.cursor() as cursor:
-							cursor.execute(f'SELECT ((SUM(closed)-SUM(sended))/COUNT(*)) FROM mc_inactive_recovery WHERE closed IS NOT NULL')
-							values = cursor.fetchone()
-						if values[0]:
-							time = relativeTimeParser(seconds=values[0],greater=True)
-							time = Template(self.bot.language.commands['recovery']['messages']['average-time-format']).safe_substitute(time=time)
+						await cursor.execute(f'SELECT ((SUM(closed)-SUM(sended))/COUNT(*)) FROM mc_inactive_recovery WHERE closed IS NOT NULL') 
+						if (time:=(await cursor.fetchone()[0])):
+							time = relativeTimeParser(seconds=time,greater=True)
+							time = f'Среднее время обработки заявки {time}'
 						else:
-							time = ""
-						content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['recovery']['messages']['response-create-message']).safe_substitute(time=time))
-						await interaction.response.send_message(embeds=embeds,content=content,ephemeral=True)	
+							time = None
+
+						embed = discord.Embed(description='Заявка на восстановление создана!\nОжидайте решение модерации.',color=discord.Colour.green())
+						if time:
+							embed.set_footer(text=time)
+						await interaction.response.send_message(embed=embed,ephemeral=True)	
+						
+						embed = discord.Embed(color=discord.Colour.green())
+						embed.add_field(name='Восстановление игрового аккаунта',value='Заявка на восстановление создана!\nОжидайте решение модерации.')
+						if time:
+							embed.set_footer(text=time)
 						try:
-							content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['recovery']['messages']['dm-create-message']).safe_substitute(time=time))
-							await interaction.user.send(embeds=embeds,content=content)
+							await interaction.user.send(embed=embed)
 						except:
 							pass
+
 						answers = [component['components'][0]['value'] for component in interaction.data['components']]
 						await self.create_inactive_recovery(interaction.user, answers)
 					else:
-						content, reference, embeds, view = DiscordManager.json_to_message(self.bot.language.commands['recovery']['messages']['active-recovery-exists'])
-						await interaction.response.send_message(content=content,embeds=embeds, ephemeral=True)
+						embed = discord.Embed(description=f'У вас уже есть активная заявка на восстановление аккаунта',color=discord.Colour.red())
+						await interaction.response.send_message(embed=embed, ephemeral=True)
 			elif customid == "inactive_recovery_disapprove":
 				if not await self.check_manage_permissions(interaction.user):
 					embed = discord.Embed(description=f'У вас недостаточно прав для взаимодействия с заявками',color=discord.Colour.red())
@@ -1062,52 +1082,46 @@ class Minecraft(commands.Cog):
 					if (id:=await cursor.fetchone()):
 						await self.callback.registration_accept(self,interaction,id[0],reason)
 
-	async def check(num):
-		if (num % self.check_every_seconds != 0):
-			return
+	async def on_check(self):
 		guild = self.bot.guild()
 		registered_role = guild.get_role(self.registered_role)
 
-		#
-		# show whitelist users count in name of channel 
-		#
-		with self.bot.cursor() as cursor:
-			if self.counter_enabled:
-				cursor.execute('SELECT 0+COUNT(*) FROM mc_accounts WHERE inactive=FALSE')
-				count = cursor.fetchone()[0]
-				for channel in self.counter_channels:
-					await guild.get_channel(channel).edit(name=self.counter_format.format(count=count))
-		#
-		# check inactives		
-		#
-		with self.bot.cursor() as cursor:
-			if 'premium' in self.bot.enabled_modules:
-				cursor.execute(f'SELECT a.discordid FROM mc_accounts AS a LEFT JOIN discord_premium AS p ON p.discordid=a.discordid WHERE COALESCE(p.end,0)<UNIX_TIMESTAMP() AND a.inactive=FALSE AND UNIX_TIMESTAMP()-a.last_join>{self.inactive_time}')
-			else:
-				cursor.execute(f'SELECT discordid FROM mc_accounts WHERE mc_accounts.inactive=FALSE AND UNIX_TIMESTAMP()-mc_accounts.last_join>{self.inactive_time}')
-			ids = cursor.fetchall()
-			if ids:
+		async with self.bot.cursor() as cursor:
+			if self.counter['enabled']:
+				await cursor.execute('SELECT 0+COUNT(*) FROM mc_accounts WHERE inactive=FALSE')
+				count = (await cursor.fetchone())[0]
+				for channel in self.counter['channels']:
+					if (channel:=guild.get_channel(channel)):
+						await channel.edit(name=self.counter['format'].format(count=count))
+			#
+			# check inactives		
+			#
+			if self.inactive['enabled']:
 				if 'premium' in self.bot.enabled_modules:
-					cursor.execute(f'UPDATE mc_accounts,discord_premium SET mc_accounts.inactive=TRUE WHERE mc_accounts.discordid=discord_premium.discordid AND COALESCE(discord_premium.end,0)<UNIX_TIMESTAMP() AND mc_accounts.inactive=FALSE AND UNIX_TIMESTAMP()-mc_accounts.last_join>{self.inactive_time}')
+					await cursor.execute(f'SELECT a.discordid FROM mc_accounts AS a LEFT JOIN discord_premium AS p ON p.discordid=a.discordid WHERE COALESCE(p.end,0)<UNIX_TIMESTAMP() AND a.inactive=FALSE AND UNIX_TIMESTAMP()-a.last_join>{self.inactive["time"]}')
 				else:
-					cursor.execute(f'UPDATE mc_accounts SET mc_accounts.inactive=TRUE WHERE mc_accounts.inactive=FALSE AND UNIX_TIMESTAMP()-mc_accounts.last_join>{self.inactive_time}')
-				
-				inactive_role = guild.get_role(self.inactive_role)
-				for discordid in ids:
-					try:
-						member = guild.get_member(discordid[0])
-						await member.remove_roles(registered_role)
-						await member.add_roles(inactive_role)
-					except:
-						pass
-		#
-		# check exceptions
-		#
-		with self.bot.cursor() as cursor:
-			cursor.execute(f'SELECT a.nick,a.id,a.discordid FROM mc_exceptions AS e JOIN mc_accounts AS a ON e.id=a.id WHERE e.end<UNIX_TIMESTAMP()')
-			users = cursor.fetchall()
+					await cursor.execute(f'SELECT discordid FROM mc_accounts WHERE mc_accounts.inactive=FALSE AND UNIX_TIMESTAMP()-mc_accounts.last_join>{self.inactive["time"]}')
+				if (ids:=await cursor.fetchall()):
+					if 'premium' in self.bot.enabled_modules:
+						await cursor.execute(f'UPDATE mc_accounts,discord_premium SET mc_accounts.inactive=TRUE WHERE mc_accounts.discordid=discord_premium.discordid AND COALESCE(discord_premium.end,0)<UNIX_TIMESTAMP() AND mc_accounts.inactive=FALSE AND UNIX_TIMESTAMP()-mc_accounts.last_join>{self.inactive["time"]}')
+					else:
+						await cursor.execute(f'UPDATE mc_accounts SET mc_accounts.inactive=TRUE WHERE mc_accounts.inactive=FALSE AND UNIX_TIMESTAMP()-mc_accounts.last_join>{self.inactive["time"]}')
+					
+					inactive_role = guild.get_role(self.inactive["role"])
+					for discordid in ids:
+						if (member:=guild.get_member(discordid[0])):
+							try:
+								await member.remove_roles(self.registered_role)
+								await member.add_roles(inactive_role)
+							except:
+								pass
+			#
+			# check exceptions
+			#
+			await cursor.execute(f'SELECT a.nick,a.id,a.discordid FROM mc_exceptions AS e JOIN mc_accounts AS a ON e.id=a.id WHERE e.end<UNIX_TIMESTAMP()')
+			users = await cursor.fetchall()
 			if users:
-				cursor.execute(f'DELETE FROM mc_exceptions WHERE end<UNIX_TIMESTAMP()')
+				await cursor.execute(f'DELETE FROM mc_exceptions WHERE end<UNIX_TIMESTAMP()')
 				guild = self.bot.guild()
 				role = guild.get_role(self.exception_role)
 				for nick,id,discordid in users:
@@ -1116,34 +1130,33 @@ class Minecraft(commands.Cog):
 						if (server:=await self.webapi.fetch_player(nick)):
 							await self.webapi.send_signal(server,'unexceptioned',str(id))
 						await member.remove_roles(role)
-		#
-		# check registrations 
-		#
-		with self.bot.cursor() as cursor:
-			cursor.execute(f'SELECT channelid FROM mc_registrations WHERE channel_deleted=FALSE AND approved=FALSE AND closed IS NULL AND sended IS NULL AND time+{self.request_duration}<UNIX_TIMESTAMP()')
-			channels = cursor.fetchall()
-			cursor.execute(f'UPDATE mc_registrations SET channel_deleted=TRUE, closed=UNIX_TIMESTAMP(), close_reason=\'Истечение срока прохождения регистрации\' WHERE channel_deleted=FALSE AND approved=FALSE AND closed IS NULL AND sended IS NULL AND time+{self.request_duration}<UNIX_TIMESTAMP()')
+			#
+			# check registrations 
+			#
+			await cursor.execute(f'SELECT channelid FROM mc_registrations WHERE channel_deleted=FALSE AND approved=FALSE AND closed IS NULL AND sended IS NULL AND time+{self.request_duration}<UNIX_TIMESTAMP()')
+			channels = await cursor.fetchall()
+			await cursor.execute(f'UPDATE mc_registrations SET channel_deleted=TRUE, closed=UNIX_TIMESTAMP(), close_reason=\'Истечение срока прохождения регистрации\' WHERE channel_deleted=FALSE AND approved=FALSE AND closed IS NULL AND sended IS NULL AND time+{self.request_duration}<UNIX_TIMESTAMP()')
 			for channelid in channels:
 				if (channel:=guild.get_channel(channelid[0])):
 					await channel.delete()
-		with self.bot.cursor() as cursor:
-			cursor.execute(f'SELECT channelid FROM mc_registrations WHERE channel_deleted=FALSE AND approved=FALSE AND closed IS NOT NULL AND closed+{self.disapproved_time}<UNIX_TIMESTAMP()')
-			channels = cursor.fetchall()
-			cursor.execute(f'UPDATE mc_registrations SET channel_deleted=TRUE WHERE channel_deleted=FALSE AND approved=FALSE AND closed IS NOT NULL AND closed+{self.disapproved_time}<UNIX_TIMESTAMP()')
+
+			await cursor.execute(f'SELECT channelid FROM mc_registrations WHERE channel_deleted=FALSE AND approved=FALSE AND closed IS NOT NULL AND closed+{self.disapproved_time}<UNIX_TIMESTAMP()')
+			channels = await cursor.fetchall()
+			await cursor.execute(f'UPDATE mc_registrations SET channel_deleted=TRUE WHERE channel_deleted=FALSE AND approved=FALSE AND closed IS NOT NULL AND closed+{self.disapproved_time}<UNIX_TIMESTAMP()')
 			for channelid in channels:
 				if (channel:=guild.get_channel(channelid[0])):
 					await channel.delete()
-		with self.bot.cursor() as cursor:
-			cursor.execute(f'SELECT channelid FROM mc_registrations WHERE channel_deleted=FALSE AND approved=TRUE AND closed IS NOT NULL AND closed+{self.approved_time}<UNIX_TIMESTAMP()')
-			channels = cursor.fetchall()
-			cursor.execute(f'UPDATE mc_registrations SET channel_deleted=TRUE WHERE channel_deleted=FALSE AND approved=TRUE AND closed IS NOT NULL AND closed+{self.approved_time}<UNIX_TIMESTAMP()')
+
+			await cursor.execute(f'SELECT channelid FROM mc_registrations WHERE channel_deleted=FALSE AND approved=TRUE AND closed IS NOT NULL AND closed+{self.approved_time}<UNIX_TIMESTAMP()')
+			channels = await cursor.fetchall()
+			await cursor.execute(f'UPDATE mc_registrations SET channel_deleted=TRUE WHERE channel_deleted=FALSE AND approved=TRUE AND closed IS NOT NULL AND closed+{self.approved_time}<UNIX_TIMESTAMP()')
 			for channelid in channels:
 				if (channel:=guild.get_channel(channelid[0])):
 					await channel.delete()
 
 	@commands.Cog.listener()	
 	async def on_member_remove(self, member: discord.Member):
-		if not self.inactive_on_leave:
+		if not self.inactive["on_leave"]:
 			return
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={member.id}')
@@ -1275,7 +1288,7 @@ class Minecraft(commands.Cog):
 				if 'next_stage' in question:
 					return question['next_stage']
 		return stage['next_stage'] if 'next_stage' in stage else None
-	def parseAnswers(self,id: int):
+	async def parseAnswers(self,id: int):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT DISTINCT a.stage,a.question,a.answer FROM mc_registrations_answers AS a JOIN mc_registrations AS s ON s.id=a.id WHERE a.id={id}')
 			answers = await cursor.fetchall()
@@ -1290,52 +1303,51 @@ class Minecraft(commands.Cog):
 		return final
 	
 	async def create_register(self,interaction,nick, id, referal):
-		with self.bot.cursor() as cursor:
+		async with self.bot.cursor() as cursor:
 			await cursor.execute("SELECT ((SUM(closed)-SUM(sended))/COUNT(*)) FROM mc_registrations WHERE closed IS NOT NULL AND sended IS NOT NULL")
-			values = cursor.fetchone()
-			if values[0]:
-				time = relativeTimeParser(seconds=values[0],greater=True)
-				time = Template(self.bot.language.commands['register']['messages']['average-time-format']).safe_substitute(time=time)
+			if (time:=(await cursor.fetchone()[0])):
+				time = relativeTimeParser(seconds=time,greater=True)
+				time = f'Среднее время обработки заявки {time}'
 			else:
-				time = ""
+				time = None
 
-			content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['channel-create-message']).safe_substitute(time=time))
-			await interaction.response.edit_message(embeds=embeds,content=content,view=None)	
+			embed = discord.Embed(description='Заявка на регистрацию создана!\nОжидайте решение модерации.',color=discord.Colour.green())
+			if time:
+				embed.set_footer(text=time)
+			await interaction.response.edit_message(embed=embed,content=None,view=None)	
+			
+			embed = discord.Embed(color=discord.Colour.green())
+			embed.add_field(name='Регистрация на игровом сервере',value='Заявка на регистрацию создана!\nОжидайте решение модерации.')
+			if time:
+				embed.set_footer(text=time)
 			try:
-				content, reference, embeds, view = DiscordManager.json_to_message(Template(self.bot.language.commands['register']['messages']['dm-create-message']).safe_substitute(time=time))
-				await interaction.user.send(embeds=embeds,content=content)
+				await interaction.user.send(embed=embed)
 			except:
 				pass
 
-			raw_user = interaction.user.mention
-			user = Template(self.bot.language.commands['register']['messages']['user-format']).safe_substitute(user=raw_user)
-			raw_nick = nick.replace('_','\\_')
-			nick = Template(self.bot.language.commands['register']['messages']['nick-format']).safe_substitute(nick=raw_nick)
-			inviter = Template(self.bot.language.commands['register']['messages']['inviter-format']).safe_substitute(user=referal.mention) if referal else ''
-			embed = discord.Embed(
-				title = Template(self.bot.language.commands['register']['messages']['embed-title']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,inviter=inviter,id=id),
-				description = Template(self.bot.language.commands['register']['messages']['embed-description']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,inviter=inviter,id=id).replace('\\n','\n'),
-				colour = discord.Colour.from_rgb(100, 100, 100)
-			)
-			
-			content = Template(self.bot.language.commands['register']['messages']['content']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user, inviter=inviter,id=id)
-			for answer in self.parseAnswers(id):
+			attributes = []
+			attributes.append(f'**Discord аккаунт:** {interaction.user.mention}')
+			nick = nick.replace('_','\\_')
+			attributes.append(f'**Никнейм:** {nick}')
+			if referal:
+				attributes.append(f'**Приглашён:** {referal.mention}')
+			attributes = '\n'.join(attributes)
+			embed = discord.Embed(title=f'Заявка на регистрацию \#{id}',description=f'{attributes}',color=discord.Colour.greyple())
+
+			for answer in await self.parseAnswers(id):
 				embed.add_field(name=answer[0],value=answer[1],inline=False)
+			
 			view = discord.ui.View(timeout=None)
-			label = self.bot.language.commands['register']['messages']['accept-button-label']
-			color = discord.ButtonStyle(self.bot.language.commands['register']['messages']['accept-button-color'])
-			view.add_item(discord.ui.Button(disabled=False,custom_id="registration_approve",label=label,style=color))
-			label = self.bot.language.commands['register']['messages']['decline-button-label']
-			color = discord.ButtonStyle(self.bot.language.commands['register']['messages']['decline-button-color'])
-			view.add_item(discord.ui.Button(disabled=False,custom_id="registration_disapprove",label=label,style=color))
-			message = await self.bot.guild().get_channel(self.channel).send(content=content,embed=embed,view=view)
-			cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
+			view.add_item(discord.ui.Button(disabled=False,custom_id="registration_approve",label='Принять',style=discord.ButtonStyle(3)))
+			view.add_item(discord.ui.Button(disabled=False,custom_id="registration_disapprove",label='Отклонить',style=discord.ButtonStyle(4)))
+			message = await self.bot.guild().get_channel(self.channel).send(embed=embed,view=view)
+			await cursor.execute(f'UPDATE mc_registrations SET sended=UNIX_TIMESTAMP(), messageid={message.id} WHERE id={id}')
 	
 	async def remove_inactive(self, member):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'UPDATE mc_accounts SET inactive=FALSE, last_join=UNIX_TIMESTAMP() WHERE discordid={member.id}')
 			await cursor.execute(f'UPDATE mc_inactive_recovery SET approved=TRUE,closed=UNIX_TIMESTAMP(),close_reason=\'Ваша заявка о восстановлении была одобрена\' WHERE discordid={member.id} AND closed IS NULL AND approved IS FALSE')
-			await member.remove_roles(interaction.guild.get_role(self.inactive_role))
+			await member.remove_roles(interaction.guild.get_role(self.inactive['role']))
 			await member.add_roles(interaction.guild.get_role(self.registered_role))
 			await cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={member.id}')
 			id,nick = await cursor.fetchone()
@@ -1345,38 +1357,33 @@ class Minecraft(commands.Cog):
 	async def create_inactive_recovery(self, member, answers: [str,...] = None):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT id, nick, time_played, first_join, last_join FROM mc_accounts WHERE discordid = {member.id}')
-			data = await cursor.fetchone()
-			if not data:
+			if not (data:=await cursor.fetchone()):
 				return False
+			id, nick, time_played, first_join, last_join = data
+
 			await cursor.execute('SELECT AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'mc_inactive_recovery\'')
 			newid = await cursor.fetchone()[0]
-			id, nick, time_played, first_join, last_join = data
 			await cursor.execute(f'SELECT bedrockUsername FROM LinkedPlayers WHERE javaUniqueId=UNHEX(REPLACE(\'{id}\', \'-\', \'\'))')
 			data = await cursor.fetchone()
-			subname = data[0] if data else None	
-			raw_user = member.mention
-			user = Template(self.bot.language.commands['recovery']['messages']['user-format']).safe_substitute(user=raw_user)
-			raw_nick = nick.replace('_','\\_')
-			if subname:
-				subname = subname.replace('_','\\_')
-				subname = Template(self.bot.language.commands['recovery']['messages']['subname-format']).safe_substitute(subname=subname)
+			
+			attributes = []
+			attributes.append(f'**Discord аккаунт:** {member.mention}')
+			nick = nick.replace('_','\\_')
+			if data[0]:
+				subname = data[0].replace('_','\\')
+				attributes.append(f'**Никнейм:** {nick} ({subname})')
 			else:
-				subname = ''
-			nick = Template(self.bot.language.commands['recovery']['messages']['nick-format']).safe_substitute(nick=raw_nick,subname=subname)
+				attributes.append(f'**Никнейм:** {nick}')
 			if first_join!=last_join:
-				last_join = Template(self.bot.language.commands['recovery']['messages']['last-join-format']).safe_substitute(time=last_join)
-			else:
-				last_join = ''
-			first_join = Template(self.bot.language.commands['recovery']['messages']['first-join-format']).safe_substitute(time=first_join)
+				attributes.append(f'**Был(а) онлайн:** <t:{last_join}:R>')
+			attributes.append(f'**Регистрация:** <t:{first_join}:R>')
 			if time_played > 0:
-				time_played = Template(self.bot.language.commands['recovery']['messages']['time-played-format']).safe_substitute(time=relativeTimeParser(seconds=time_played))
-			else:
-				time_played = ''
-			embed = discord.Embed(
-				title = Template(self.bot.language.commands['recovery']['messages']['embed-title']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,time_played=time_played,last_join=last_join,first_join=first_join,id=newid),
-				description = Template(self.bot.language.commands['recovery']['messages']['embed-description']).safe_substitute(raw_nick=raw_nick,nick=nick,raw_user=raw_user,user=user,time_played=time_played,last_join=last_join,first_join=first_join,id=newid).replace('\\n','\n'),
-				colour = discord.Colour.from_rgb(100, 100, 100)
-				) 
+				time_played = relativeTimeParser(seconds=time_played,greater=True)
+				attributes.append(f'**Время игры:** {time_played}')
+
+			attributes = '\n'.join(attributes)
+			embed = discord.Embed(title=f'Заявка на восстановление \#{id}',description=f'{attributes}',color=discord.Colour.greyple())
+
 			questions = self.recovery_questions()
 			if answers:
 				for i in range(len(questions)):
@@ -1465,4 +1472,66 @@ class Minecraft(commands.Cog):
 		if not bool(set(role.id for role in member.roles) & set(roles)):
 			return False
 		return True
-	
+
+	async def sync_roles(self):
+		guild = self.bot.guild()
+		
+		registered_role = guild.get_role(self.registered_role)
+
+		async with self.bot.cursor() as cursor:
+			if self.inactive['enabled']:
+				await cursor.execute(f'SELECT a.discordid FROM mc_accounts AS a LEFT JOIN mc_exceptions AS e ON a.id=e.id WHERE (e.end IS NULL OR e.end<UNIX_TIMESTAMP()) AND inactive=FALSE')
+			else:
+				await cursor.execute(f'SELECT a.discordid FROM mc_accounts AS a LEFT JOIN mc_exceptions AS e ON a.id=e.id WHERE (e.end IS NULL OR e.end<UNIX_TIMESTAMP())')
+			users = await cursor.fetchall()
+		users = [id[0] for id in users] if users else []
+		for member in registered_role.members:
+			fetched = None
+			for i in range(len(users)):
+				if member.id == users[i]:
+					fetched = i
+			if fetched != None:
+				users.pop(fetched)
+			else:
+				await member.remove_roles(registered_role)
+		for id in users:
+			if (member:= guild.get_member(id)):
+				await member.add_roles(registered_role)
+
+		if self.inactive['enabled']:
+			inactive_role = guild.get_role(self.inactive['role'])
+			async with self.bot.cursor() as cursor:
+				await cursor.execute(f'SELECT a.discordid FROM mc_accounts AS a LEFT JOIN mc_exceptions AS e ON a.id=e.id WHERE (e.end IS NULL OR e.end<UNIX_TIMESTAMP()) AND inactive=TRUE')
+				users = await cursor.fetchall()
+			users = [id[0] for id in users] if users else []
+			for member in inactive_role.members:
+				fetched = None
+				for i in range(len(users)):
+					if member.id == users[i]:
+						fetched = i
+				if fetched != None:
+					users.pop(fetched)
+				else:
+					await member.remove_roles(inactive_role)
+			for id in users:
+				if (member:= guild.get_member(id)):
+					await member.add_roles(inactive_role)
+
+		exception_role = guild.get_role(self.exception_role)
+
+		async with self.bot.cursor() as cursor:
+			await cursor.execute(f'SELECT a.discordid FROM mc_accounts AS a LEFT JOIN mc_exceptions AS e ON a.id=e.id WHERE e.end>UNIX_TIMESTAMP()')
+			users = await cursor.fetchall()
+		users = [id[0] for id in users] if users else []
+		for member in exception_role.members:
+			fetched = None
+			for i in range(len(users)):
+				if member.id == users[i]:
+					fetched = i
+			if fetched != None:
+				users.pop(fetched)
+			else:
+				await member.remove_roles(exception_role)
+		for id in users:
+			if (member:= guild.get_member(id)):
+				await member.add_roles(exception_role)
