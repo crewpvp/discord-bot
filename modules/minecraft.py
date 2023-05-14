@@ -880,7 +880,7 @@ class Minecraft(commands.Cog):
 		await interaction.response.send_message(embed=embed, ephemeral=False)
 
 	@commands.Cog.listener()
-	async def interaction(self,interaction: discord.Interaction):
+	async def on_interaction(self,interaction: discord.Interaction):
 		if interaction.type == discord.InteractionType.component:
 			customid = interaction.data['custom_id']
 			if customid == "inactive_recovery_start":
