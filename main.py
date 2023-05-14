@@ -1,147 +1,128 @@
-from modules.votes import DiscordVotes
-from modules.greetings import DiscordGreeting
-from modules.farewells import DiscordFarewell
-from modules.mutes import DiscordMutes
-from modules.nickcolors import DiscordNickColor
-from modules.tickets import DiscordTickets
-from modules.profiles import DiscordProfiles
-from modules.premium import DiscordPremium
-from modules.minecraft import DiscordMinecraft
-from modules.vkmemes import DiscordVkMemes
-from modules.chatgpt import DiscordChatGPT
-from modules.autovoice import DiscordAutoVoice
-from manager import DiscordManager
-from language import DiscordLanguage
+from discord.ext import tasks, commands
+import asyncmy, discord, yaml, logging, asyncio
 
-from discord import app_commands
-from discord.ext import tasks
-import mariadb, discord, yaml, asyncio
+from modules.greetings import Greetings
+from modules.farewells import Farewells
+from modules.autovoice import AutoVoice
+from modules.manager import Manager
+from modules.votes import Votes
+from modules.vkmemes import VkMemes
+from modules.nickcolors import NickColors
+from modules.premium import Premium
+from modules.mutes import Mutes
+from modules.tickets import Tickets
+from modules.profiles import Profiles
+from modules.chatgpt import ChatGPT
+from modules.minecraft import Minecraft
 
-class Bot(discord.Client):
+class pool_generator:
+	def __init__(self,database: str, password: str, user: str, host: str, port: int):
+		self.database = database
+		self.password = password
+		self.user = user
+		self.host = host
+		self.port = port
+		self.connection_pool = None
+	
+	def get_cursor(self):
+		return cursor_context_manager(self)
+
+	async def new_connection_pool(self):
+		while not self.connection_pool:
+			try:
+				self.connection_pool = await asyncmy.create_pool(database=self.database,password=self.password,user=self.user,host=self.host,port=self.port, autocommit=True)
+			except:
+				print("Невозможно подключиться в БД, повтор через 5 секунд")
+				asyncio.sleep(5)
+
+class cursor_context_manager:
+	def __init__(self,pool_generator):
+		self.pool_generator = pool_generator
+
+	async def __aenter__(self):
+		try:
+			self.connection = await self.pool_generator.connection_pool.acquire()
+			self.cursor = self.connection.cursor()
+		except:
+			await self.pool_generator.new_connection_pool()
+			self.connection = await self.pool_generator.connection_pool.acquire()
+			self.cursor = self.connection.cursor()
+		return self.cursor
+
+	async def __aexit__(self, exc_type, exc, tb):
+		await self.cursor.close()
+		self.pool_generator.connection_pool.release(self.connection)
+
+class Bot(commands.Bot):
 
 	def __init__(self, config_path: str):
-		super().__init__(intents=discord.Intents.all())
-		self.config_path = config_path
-		
+		super().__init__(command_prefix='!', help_command=None, intents=discord.Intents.all())
 
 		self.synced = False
-		self.tree = app_commands.CommandTree(self)
+		self.config_path = config_path
 
 		with open(config_path) as f:
 			self.config = yaml.load(f, Loader=yaml.FullLoader)
 		self.guild_id = self.config['discord']['guild-id']
 
-		with open('language.yml') as f:
-			self.language = yaml.load(f, Loader=yaml.FullLoader)
-		self.language = DiscordLanguage(self,self.language)
-		
-		self.connection = mariadb.connect(**self.config['mariadb'], autocommit=True)
-
-		self.buttons = {}
-		
 		modules = self.config['modules']
 		self.enabled_modules = [module for module in modules.keys() if 'enabled' in modules[module] and modules[module]['enabled']]
-		self.modules = {}
 		
-		if 'premium' in self.enabled_modules:
-			self.modules['premium'] = DiscordPremium(self, **modules['premium']['settings'])
-		if 'votes' in self.enabled_modules:
-			self.modules['votes'] = DiscordVotes(self, **modules['votes']['settings'])
-		if 'farewells' in self.enabled_modules:
-			self.modules['farewells'] = DiscordFarewell(self, **modules['farewells']['settings'])
-		if 'greetings' in self.enabled_modules:
-			self.modules['greetings'] = DiscordGreeting(self, **modules['greetings']['settings'])
-		if 'mutes' in self.enabled_modules:
-			self.modules['mutes'] = DiscordMutes(self, **modules['mutes']['settings'])
-		if 'nick-colors' in self.enabled_modules:
-			self.modules['nick-colors'] = DiscordNickColor(self, **modules['nick-colors']['settings'])
-		if 'tickets' in self.enabled_modules:
-			self.modules['tickets'] = DiscordTickets(self, **modules['tickets']['settings'])
-		if 'profiles' in self.enabled_modules:
-			self.modules['profiles'] = DiscordProfiles(self, **modules['profiles']['settings'])
-		if 'minecraft' in self.enabled_modules:
-			self.modules['minecraft'] = DiscordMinecraft(self, **modules['minecraft']['settings'])
-		if 'vkmemes' in self.enabled_modules:
-			self.modules['vkmemes'] = DiscordVkMemes(self, **modules['vkmemes']['settings'])
-		if 'auto-voice' in self.enabled_modules:
-			self.modules['autovoice'] = DiscordAutoVoice(self, **modules['auto-voice']['settings'])
-		if 'chat-gpt' in self.enabled_modules:
-			self.modules['chatgpt'] = DiscordChatGPT(self,**modules['chat-gpt']['settings'])
+		self.connection_pool = pool_generator(**self.config['mariadb'])
 		
-		self.timer = 0
-		self.discord_manager = DiscordManager(self)
-		self.language.register_groups()
-
-		@self.event
-		async def on_interaction(interaction: discord.Interaction):
-			for module in self.modules.values():
-				if hasattr(module, 'interaction'):
-					await module.interaction(interaction) 
-		
-		@self.event
-		async def on_member_remove(member: discord.Member):
-			for module in self.modules.values():
-				if hasattr(module, 'member_remove'):
-					await module.member_remove(member) 
-
-		@self.event
-		async def on_member_join(member: discord.Member):
-			for module in self.modules.values():
-				if hasattr(module, 'member_join'):
-					await module.member_join(member)
-
-		@self.event
-		async def on_voice_state_update(member: discord.Member, before, after):
-			for module in self.modules.values():
-				if hasattr(module, 'voice_state_update'):
-					await module.voice_state_update(member,before,after)
-
-		@self.event
-		async def on_member_update(before, after):
-			for module in self.modules.values():
-				if hasattr(module, 'member_update'):
-					await module.member_update(before,after) 
-
-		@self.event
-		async def on_message(message):
-			for module in self.modules.values():
-				if hasattr(module, 'message'):
-					await module.message(message) 
-
 		self.run(self.config['discord']['token'])
-		
-	def cursor(self):
-		try:
-			return self.connection.cursor()
-		except:
-			self.connection = mariadb.connect(**self.config['mariadb'], autocommit=True)
-			return self.connection.cursor()
 
+	def cursor(self):
+		return self.connection_pool.get_cursor()
+	
 	def guild(self):
 		return self.get_guild(self.guild_id)
 
 	def guild_object(self):
 		return discord.Object(id=self.guild_id)
+	
+	async def setup_hook(self):
+		await self.connection_pool.new_connection_pool()
+		if 'farewells' in self.enabled_modules:
+			await self.add_cog(Farewells(self, **self.config['modules']['farewells']['settings']),guild=self.guild_object())
+		if 'greetings' in self.enabled_modules:
+			await self.add_cog(Greetings(self, **self.config['modules']['greetings']['settings']),guild=self.guild_object())
+		if 'autovoice' in self.enabled_modules:
+			await self.add_cog(AutoVoice(self, **self.config['modules']['autovoice']['settings']),guild=self.guild_object())
+		if 'votes' in self.enabled_modules:
+			await self.add_cog(Votes(self, **self.config['modules']['votes']['settings']),guild=self.guild_object())
+		if 'vkmemes' in self.enabled_modules:
+			await self.add_cog(VkMemes(self, **self.config['modules']['vkmemes']['settings']),guild=self.guild_object())
+		if 'nickcolors' in self.enabled_modules:
+			await self.add_cog(NickColors(self, **self.config['modules']['nickcolors']['settings']),guild=self.guild_object())
+		if 'premium' in self.enabled_modules:
+			await self.add_cog(Premium(self, **self.config['modules']['premium']['settings']),guild=self.guild_object())
+		if 'mutes' in self.enabled_modules:
+			await self.add_cog(Mutes(self, **self.config['modules']['mutes']['settings']),guild=self.guild_object())
+		if 'tickets' in self.enabled_modules:
+			await self.add_cog(Tickets(self, **self.config['modules']['tickets']['settings']),guild=self.guild_object())
+		if 'profiles' in self.enabled_modules:
+			await self.add_cog(Profiles(self, **self.config['modules']['profiles']['settings']),guild=self.guild_object())
+		if 'chatgpt' in self.enabled_modules:
+			await self.add_cog(ChatGPT(self,**self.config['modules']['chatgpt']['settings']),guild=self.guild_object())
+		if 'minecraft' in self.enabled_modules:
+			await self.add_cog(Minecraft(self, **self.config['modules']['minecraft']['settings']),guild=self.guild_object())
+		await self.add_cog(Manager(self),guild=self.guild_object())
+		print('Загружены все расширения')
 
 	async def on_ready(self):
 		await self.wait_until_ready()
 		if not self.synced:
 			await self.tree.sync(guild = self.guild_object())
 			self.synced = True
-		
-		#self.tree.clear_commands(guild = None)
-		#await self.tree.sync(guild = None)
-
 		print(f'Бот {self.user} был успешно подключен')
 		
-		self.check.start()
-
-
-	@tasks.loop(seconds=1)
-	async def check(self):
-		for module in self.modules.values():
-			if hasattr(module, 'check'):
-				await module.check(self.timer) 
-		self.timer += 1
+logging.getLogger('discord').setLevel(logging.ERROR)
+logging.getLogger('discord.client').setLevel(logging.ERROR)
+logging.getLogger('discord.gateway').setLevel(logging.ERROR)
+logging.getLogger('discord.http').setLevel(logging.ERROR)
+logging.getLogger('asyncmy').setLevel(logging.ERROR)
+logging.getLogger('revChatGPT.V1').setLevel(logging.ERROR)
+logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
 
 bot = Bot("config.yml")
