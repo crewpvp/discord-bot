@@ -155,7 +155,8 @@ class Tickets(commands.Cog):
 				channel_link = f'https://discord.com/channels/{self.bot.guild_id}/{ticket_channel.id}'
 				embed = discord.Embed(description=f'Тикет принят, перейдите в [канал]({channel_link})',color=discord.Colour.green())
 				try:
-					notify_embed = discord.Embed(title='Система тикетов',description=f'Ваш тикет был принят, перейдите в [канал]({channel_link})',color=discord.Colour.green())
+					notify_embed = discord.Embed(color=discord.Colour.green())
+					notify_embed.add_field(name='Система тикетов',value=f'Ваш тикет был принят, перейдите в [канал]({channel_link})')
 					await ticket_member.send(embed=notify_embed)
 				except:
 					pass
