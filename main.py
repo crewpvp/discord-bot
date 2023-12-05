@@ -1,19 +1,8 @@
 from discord.ext import tasks, commands
 import asyncmy, discord, yaml, logging, asyncio
 
-from modules import Greetings
-from modules import Farewells
-from modules import AutoVoice
-from modules import Manager
-from modules import Votes
-from modules import VkMemes
-from modules import NickColors
-from modules import Premium
-from modules import Mutes
-from modules import Tickets
-from modules import Profiles
-from modules import ChatGPT
-from modules import Minecraft
+from modules import Greetings, Farewells, AutoVoice, Manager, Votes, VkMemes
+from modules import NickColors, Premium, Mutes, Tickets, Profiles, ChatGPT, Minecraft
 
 class pool_generator:
 	def __init__(self,database: str, password: str, user: str, host: str, port: int):
