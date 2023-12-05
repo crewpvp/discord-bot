@@ -484,7 +484,7 @@ class Minecraft(commands.Cog):
 			code = random.randrange(10000,99999)
 			code_time = int(datetime.now().timestamp())+(minutes*60)
 			await cursor.execute(f'UPDATE mc_accounts SET code={code}, code_time={code_time} WHERE id=\'{uuid}\'')
-			embed = discord.Embed(description=f'Ваш одноразовый код для входа на игровой аккаунт: ||{code}||\nДействительность кода истекает <t:{time}:R>',color=discord.Colour.green())
+			embed = discord.Embed(description=f'Ваш одноразовый код для входа на игровой аккаунт: ||{code}||\nДействительность кода истекает <t:{code_time}:R>',color=discord.Colour.green())
 			await interaction.response.send_message(embed=embed, ephemeral=True)
 
 	@app_commands.command(name='register',description='начать регистрацию')
