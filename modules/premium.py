@@ -58,7 +58,7 @@ class Premium(commands.Cog):
 	async def on_member_join(self,member: discord.Member):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute(f'SELECT discordid FROM discord_premium WHERE discordid={member.id} AND end IS NOT NULL AND start IS NOT NULL')
-			if cursor.fetchone():
+			if await cursor.fetchone():
 				guild = self.bot.guild()
 				role = guild.get_role(self.premium_role)
 				await member.add_roles(role)
