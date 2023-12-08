@@ -3,3 +3,4 @@ discord.py==2.0.1
 PyYAML==6.0
 revChatGPT==4.2.5
 vkbottle==4.3.12
+jsonschema==3.2.0
