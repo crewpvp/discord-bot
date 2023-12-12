@@ -11,3 +11,4 @@ from .tickets import Tickets
 from .profiles import Profiles
 from .chatgpt import ChatGPT
 from .minecraft import Minecraft
+from .simplechatgpt import SimpleChatGPT

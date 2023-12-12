@@ -2,8 +2,8 @@ from discord.ext import tasks, commands
 import discord, yaml, logging, asyncio
 from utils import Connector
 
-from modules import Greetings, Farewells, AutoVoice, Manager, Votes, VkMemes
-from modules import NickColors, Premium, Mutes, Tickets, Profiles, ChatGPT, Minecraft
+from modules import Greetings, Farewells, AutoVoice, Manager, Votes, VkMemes, NickColors
+from modules import Premium, Mutes, Tickets, Profiles, ChatGPT, SimpleChatGPT, Minecraft 
 
 class Bot(commands.Bot):
 
@@ -57,6 +57,8 @@ class Bot(commands.Bot):
 			await self.add_cog(Profiles(self, **self.config['modules']['profiles']['settings']),guild=self.guild_object())
 		if 'chatgpt' in self.enabled_modules:
 			await self.add_cog(ChatGPT(self,**self.config['modules']['chatgpt']['settings']),guild=self.guild_object())
+		if 'simplechatgpt' in self.enabled_modules:
+			await self.add_cog(SimpleChatGPT(self,**self.config['modules']['simplechatgpt']['settings']),guild=self.guild_object())
 		if 'minecraft' in self.enabled_modules:
 			await self.add_cog(Minecraft(self, **self.config['modules']['minecraft']['settings']),guild=self.guild_object())
 		await self.add_cog(Manager(self),guild=self.guild_object())
