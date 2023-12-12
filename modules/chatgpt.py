@@ -64,6 +64,8 @@ class ChatGPT(commands.Cog):
 					await self.process_delayed_questions()
 				self.blocked = False
 			return
+		if not bool(set(self.allowed_roles) & set([role.id for role in message.author.roles])):
+			return
 		if self.blocked:
 			if self.delayed_answers['enabled']:
 				self.add_delayed_question(message)
