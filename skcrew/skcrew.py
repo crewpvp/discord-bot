@@ -1,5 +1,5 @@
-from datatypes import Server, Player, Signal
-from exceptions import parseError
+from .datatypes import Server, Player, Signal
+from .exceptions import parseError
 import aiohttp
 from json import dumps
 
