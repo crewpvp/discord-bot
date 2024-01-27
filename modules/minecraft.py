@@ -3,56 +3,7 @@ from discord import app_commands
 from discord.ext import commands,tasks
 from datetime import datetime
 from utils import relativeTimeParser,json_to_message
-
-class MinecraftWebAPI:
-	def __init__(self, host: str, login: str, password: str):
-		self.host = host
-		self.auth = aiohttp.BasicAuth(login, password)
-
-	async def get_servers(self, online: bool = True) -> tuple[str,...] | None:
-		async with aiohttp.ClientSession() as session:
-			params = {'online':str(online).lower()}
-			try:
-				async with session.get(url=self.host+'/servers',auth=self.auth,params=params) as response:
-					return await response.json()
-			except:
-				return None
-  
-	async def fetch_player(self, nick: str) -> str | None:
-		async with aiohttp.ClientSession() as session:
-			try:
-				async with session.get(url=self.host+f'/player/{nick}',auth=self.auth) as response:
-					return await response.json() if response.status == 200 else None
-			except:
-				return None
-
-	async def get_players(self, *servers: str) ->  tuple[str,...] | None:
-		async with aiohttp.ClientSession() as session:
-			try:
-				params = {'server':servers} if servers else None
-				async with session.get(url=self.host+f'/players',auth=self.auth, params=params) as response:
-					return await response.json() if response.status == 200 else None
-			except:
-				return None
-
-	async def send_command(self, server:str, command: str) -> bool:
-		async with aiohttp.ClientSession() as session:
-			try:
-				async with session.get(url=self.host+f'/server/{server}/command?{command}',auth=self.auth) as response:
-					return True if response.status==200 else False 
-			except:
-				return False
-  
-	async def send_signal(self, server: str,key: str, value: str = None) -> bool:
-		async with aiohttp.ClientSession() as session:
-			try: 
-				if value:
-					resp = await session.get(url=self.host+f'/server/{server}/signal?key={key}&value={value}',auth=self.auth)
-				else:
-					resp = await session.get(url=self.host+f'/server/{server}/signal?key={key}',auth=self.auth)
-				return True if resp.status==200 else False 
-			except:
-				return False
+import skcrew
 
 class Minecraft(commands.Cog):
 	def __init__(self, bot, category: int, channel: int, cooldown: int, registered_role: int,approved_time:int, disapproved_time: int,request_duration: int,exception_role: int,inactive: {}, counter: {}, check_every_seconds: int, web_host: str, web_login: str, web_password: str, link_cooldown: int, nick_change_cooldown: int):
@@ -71,8 +22,7 @@ class Minecraft(commands.Cog):
 		self.approved_time = approved_time
 		self.check_every_seconds = check_every_seconds
 		self.exception_role = exception_role
-		self.webapi = MinecraftWebAPI(web_host, web_login,web_password)
-
+		self.skcrewapi = skcrew.api(web_host,web_login,web_password)
 		self.check = tasks.loop(seconds=self.check_every_seconds)(self.on_check)
 	
 	@commands.Cog.listener()
@@ -171,19 +121,19 @@ class Minecraft(commands.Cog):
 					await message.edit(content=None,view=None,embed=embed)
 
 				embed = discord.Embed(color=discord.Colour.green())
-				embed.add_field(name='Регистрация на игровом сервере',value='Ваша заявка была одобрена! Приятной игры!')
-				embed.add_field(name='Информбюро: о режимах',value='У сервера существует информбюро «о режимах»\nНайти его можно по ссылке [info.crewpvp.xyz](https://info.crewpvp.xyz/) или в канале <#967423687965966336>')
-				embed.add_field(name='Информбюро: тикеты',value='Вам нужна помощь? Напишите свой вопрос в тикете и мы поможем\nКанал: <#1022157438033608774>')
+				embed.add_field(name='Регистрация на игровом сервере',value='Ваша заявка была одобрена! Приятной игры!',inline=False)
+				embed.add_field(name='Информбюро: о режимах',value='У сервера существует информбюро «о режимах»\nНайти его можно по ссылке [info.crewpvp.xyz](https://info.crewpvp.xyz/) или в канале <#967423687965966336>',inline=False)
+				embed.add_field(name='Информбюро: тикеты',value='Вам нужна помощь? Напишите свой вопрос в тикете и мы поможем\nКанал: <#1022157438033608774>',inline=False)
 				try:
 					await member.send(embed=embed)
 				except:
 					pass
 				if channel:
 					embed = discord.Embed(color=discord.Colour.green())
-					embed.add_field(name='Регистрация на игровом сервере',value='Ваша заявка была одобрена! Приятной игры!')
-					embed.add_field(name='Вам выдана роль с доступом к разделу Minecraft',value='Познакомьтесь с другими пользователями, имеющими роль <@&943836722557513779>\nБудьте уверены, большинство будет радо пообщаться и поиграть вместе!')
-					embed.add_field(name='Информбюро: о режимах',value='У сервера существует информбюро «о режимах»\nНайти его можно по ссылке [info.crewpvp.xyz](https://info.crewpvp.xyz/) или в канале <#967423687965966336>')
-					embed.add_field(name='Информбюро: тикеты',value='Вам нужна помощь? Напишите свой вопрос в тикете и мы поможем\nКанал: <#1022157438033608774>')
+					embed.add_field(name='Регистрация на игровом сервере',value='Ваша заявка была одобрена! Приятной игры!',inline=False)
+					embed.add_field(name='Вам выдана роль с доступом к разделу Minecraft',value='Познакомьтесь с другими пользователями, имеющими роль <@&943836722557513779>\nБудьте уверены, большинство будут рады пообщаться и поиграть вместе!',inline=False)
+					embed.add_field(name='Информбюро: о режимах',value='У сервера существует информбюро «о режимах»\nНайти его можно по ссылке [info.crewpvp.xyz](https://info.crewpvp.xyz/) или в канале <#967423687965966336>',inline=False)
+					embed.add_field(name='Информбюро: тикеты',value='Вам нужна помощь? Напишите свой вопрос в тикете и мы поможем\nКанал: <#1022157438033608774>',inline=False)
 					await channel.send(embed=embed)
 				embed = discord.Embed(description='Заявка была одобрена', color=discord.Colour.green())
 			else:
@@ -441,12 +391,13 @@ class Minecraft(commands.Cog):
 			await interaction.response.send_message(embed=embed, ephemeral=True)
 			return
 		uuid,nick = data
-		if not (server:=await self.webapi.fetch_player(nick)):
+		try:
+			player=await self.skcrewapi.player(uuid)
+			await self.skcrewapi.signals(signals=[skcrew.Signal('authorize',[str(uuid)])],servers=[player.server])
+			embed = discord.Embed(description='Вы успешно авторизованны!',color=discord.Colour.green())
+		except:
 			embed = discord.Embed(description='Для авторизации вы должны быть онлайн на игровом сервере',color=discord.Colour.red())
-			await interaction.response.send_message(embed=embed, ephemeral=True)
-			return
-		await self.webapi.send_signal(server,'authorize',str(uuid))
-		embed = discord.Embed(description='Вы успешно авторизованны!',color=discord.Colour.green())
+		
 		await interaction.response.send_message(embed=embed, ephemeral=True)
 		
 	@app_commands.command(name='logout',description='выйти с аккаунта на игровом сервере')
@@ -463,8 +414,11 @@ class Minecraft(commands.Cog):
 				embed = discord.Embed(description='Вы и так не авторизованны',color=discord.Colour.red())
 				await interaction.response.send_message(embed=embed, ephemeral=True)
 				return
-			if (server:=await self.webapi.fetch_player(nick)):
-				await self.webapi.send_signal(server,'logout',str(uuid))
+			try: 
+				player=await self.skcrewapi.player(uuid)
+				await self.skcrewapi.signals(signals=[skcrew.Signal('logout',[str(uuid)])],servers=[player.server])
+			except:
+				pass
 			await cursor.execute(f'UPDATE mc_accounts SET ip=NULL WHERE id=\'{uuid}\'')
 			embed = discord.Embed(description='Вы успешно вышли из игрового аккаунта!',color=discord.Colour.green())
 			await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -617,8 +571,11 @@ class Minecraft(commands.Cog):
 					await interaction.response.send_message(embed=embed, ephemeral=True)
 					return
 				await cursor.execute(f'UPDATE mc_accounts SET id = \'{java_uuid}\', nick = \'{java_nick}\', pseudonym=\'{java_nick}\' WHERE discordid={interaction.user.id}')
-				if (server:=await self.webapi.fetch_player(bedrock_nick)):
-					await self.webapi.send_signal(server,'link_account',str(bedrock_uuid))
+				try:
+					player = await self.skcrewapi.player(bedorck_uuid)
+					await self.skcrewapi.signals(signals=[skcrew.Signal('link_account',[str(bedrock_uuid)])],servers=[player.server])
+				except:
+					pass
 			else:
 				java_uuid, java_nick = id, nickname
 				if not re.match("^\.?[A-Za-z][A-Za-z0-9]{0,11}[0-9]{0,4}",nick) is not None:
@@ -674,8 +631,11 @@ class Minecraft(commands.Cog):
 				await cursor.execute(f'DELETE FROM LinkedPlayers WHERE javaUniqueId = UNHEX(REPLACE(\'{java_uuid}\', \'-\', \'\')) AND bedrockId = UNHEX(REPLACE(\'{bedrock_uuid}\', \'-\', \'\'))')
 				if environment == 0:
 					await cursor.execute(f'UPDATE mc_accounts SET id=\'{bedrock_uuid}\', nick=\'{bedrock_nick}\', pseudonym=\'{bedrock_nick}\' WHERE id=\'{java_uuid}\'')
-					if (server:=await self.webapi.fetch_player(java_nick)):
-						await self.webapi.send_signal(server,'unlink_account',str(java_uuid))
+					try:
+						player=await self.skcrewapi.player(java_uuid)
+						await self.skcrewapi.signals(signals=[skcrew.Signal('unlink_account',[str(java_uuid)])],servers=[player.server])
+					except:
+						pass
 				embed = discord.Embed(description='Аккаунт успешно отвязан',color=discord.Colour.green())
 				if interaction.message:
 					await interaction.response.edit_message(embed=embed,view=None)
@@ -721,8 +681,11 @@ class Minecraft(commands.Cog):
 				return
 
 			await cursor.execute(f'UPDATE mc_accounts SET id = \'{uuid}\', nick = \'{nick}\', pseudonym=\'{nick}\' WHERE discordid={interaction.user.id}')
-			if (server:=await self.webapi.fetch_player(previous_nick)):
-				await self.webapi.send_signal(server,'change_nick',str(previous_uuid))
+			try:
+				player=await self.skcrewapi.player(previous_uuid)
+				await self.skcrewapi.signals(signals=[skcrew.Signal('change_nick',[str(previous_uuid)])],servers=[player.server])
+			except:
+				pass
 			nick = nick.replace('_','\\\\_')
 			embed = discord.Embed(description=f'Ник изменен на **`{nick}`**',color=discord.Colour.green())
 			await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -899,7 +862,7 @@ class Minecraft(commands.Cog):
 				async with self.bot.cursor() as cursor:
 					await cursor.execute(f'SELECT id FROM mc_inactive_recovery WHERE messageid={interaction.message.id}')
 					if (id:=await cursor.fetchone()):
-						await self.callback.recovery_accept(self,interaction,id[0])
+						await self.recovery_accept.callback(self,interaction,id[0])
 			elif customid == "inactive_recovery_disapprove":
 				if not await self.check_manage_permissions(interaction.user):
 					embed = discord.Embed(description=f'У вас недостаточно прав для взаимодействия с заявками',color=discord.Colour.red())
@@ -982,7 +945,7 @@ class Minecraft(commands.Cog):
 				async with self.bot.cursor() as cursor:
 					await cursor.execute(f'SELECT id FROM mc_registrations WHERE messageid={interaction.message.id}')
 					if (id:=await cursor.fetchone()):
-						await self.callback.registration_accept(self,interaction,id[0])
+						await self.registration_accept.callback(self,interaction,id[0])
 			elif customid == 'unlink_account':
 				await self.unlink.callback(interaction, app_commands.Choice(name='маня мирок', value=int(interaction.data['values'][0])))
 		elif interaction.type == discord.InteractionType.modal_submit:
@@ -1026,7 +989,7 @@ class Minecraft(commands.Cog):
 				async with self.bot.cursor() as cursor:
 					await cursor.execute(f'SELECT id FROM mc_inactive_recovery WHERE messageid={interaction.message.id}')
 					if (id:=await cursor.fetchone()):
-						await self.callback.recovery_accept(self,interaction,id[0],reason)
+						await self.recovery_accept.callback(self,interaction,id[0],reason)
 			elif customid == "registration_start_bedrock":
 				nick = interaction.data['components'][0]['components'][0]['value']
 				referal = interaction.data['components'][1]['components'][0]['value']
@@ -1080,7 +1043,7 @@ class Minecraft(commands.Cog):
 				async with self.bot.cursor() as cursor:
 					await cursor.execute(f'SELECT id FROM mc_registrations WHERE messageid={interaction.message.id}')
 					if (id:=await cursor.fetchone()):
-						await self.callback.registration_accept(self,interaction,id[0],reason)
+						await self.registration_accept.callback(self,interaction,id[0],reason)
 
 	async def on_check(self):
 		guild = self.bot.guild()
@@ -1127,8 +1090,11 @@ class Minecraft(commands.Cog):
 				for nick,id,discordid in users:
 					member = guild.get_member(discordid)
 					if member:
-						if (server:=await self.webapi.fetch_player(nick)):
-							await self.webapi.send_signal(server,'unexceptioned',str(id))
+						try:
+							player=await self.skcrewapi.player(id)
+							await self.skcrewapi.signals(signals=[skcrew.Signal('unexceptioned',[str(id)])],servers=[player.server])
+						except:
+							pass
 						await member.remove_roles(role)
 			#
 			# check registrations 
@@ -1164,8 +1130,11 @@ class Minecraft(commands.Cog):
 			if not data:
 				return
 			id,nick = data
-			if (server:=await self.webapi.fetch_player(nick)):
-				await self.webapi.send_signal(server,'leaved',str(id))
+			try:
+				player=await self.skcrewapi.player(id)
+				await self.skcrewapi.signals(signals=[skcrew.Signal('leaved',[str(id)])],servers=[player.server])
+			except:
+				pass
 			await cursor.execute(f'UPDATE mc_accounts SET mc_accounts.inactive=TRUE WHERE discordid={member.id}')
 
 	async def fetchDiscordByNick(self,nick: str):
@@ -1305,7 +1274,7 @@ class Minecraft(commands.Cog):
 	async def create_register(self,interaction,nick, id, referal):
 		async with self.bot.cursor() as cursor:
 			await cursor.execute("SELECT ((SUM(closed)-SUM(sended))/COUNT(*)) FROM mc_registrations WHERE closed IS NOT NULL AND sended IS NOT NULL")
-			if (time:=(await cursor.fetchone()[0])):
+			if (time:=((await cursor.fetchone())[0])):
 				time = relativeTimeParser(seconds=time,greater=True)
 				time = f'Среднее время обработки заявки {time}'
 			else:
@@ -1351,8 +1320,11 @@ class Minecraft(commands.Cog):
 			await member.add_roles(interaction.guild.get_role(self.registered_role))
 			await cursor.execute(f'SELECT id,nick FROM mc_accounts WHERE discordid={member.id}')
 			id,nick = await cursor.fetchone()
-			if (server:=await self.webapi.fetch_player(nick)):
-				await self.webapi.send_signal(server,'inactive_remove',str(id))
+			try:
+				player=await self.skcrewapi.player(id)
+				await self.skcrewapi.signals(signals=[skcrew.Signal('inactive_remove',[str(id)])],servers=[player.server])
+			except:
+				pass
 
 	async def create_inactive_recovery(self, member, answers: [str,...] = None):
 		async with self.bot.cursor() as cursor:
@@ -1437,8 +1409,11 @@ class Minecraft(commands.Cog):
 				await cursor.execute(f'INSERT INTO mc_exceptions (id,end,reason) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time},%s) ON DUPLICATE KEY UPDATE end=end+{time}, reason=%s',(reason,reason,))
 			else:
 				await cursor.execute(f'INSERT INTO mc_exceptions (id,end) VALUES (\'{id}\',UNIX_TIMESTAMP()+{time}) ON DUPLICATE KEY UPDATE end=end+{time}')
-			if (server:=await self.webapi.fetch_player(nick)):
-				await self.webapi.send_signal(server,'exceptioned',str(id))
+			try:
+				player=await self.skcrewapi.player(id)
+				await self.skcrewapi.signals(signals=[skcrew.Signal('exceptioned',[str(id)])],servers=[player.server])
+			except:
+				pass
 			if(member:=self.bot.guild().get_member(data[0])):
 				await member.add_roles(self.bot.guild().get_role(self.exception_role))
 				return member
@@ -1451,8 +1426,11 @@ class Minecraft(commands.Cog):
 			await cursor.execute(f'SELECT a.discordid FROM mc_exceptions AS e JOIN mc_accounts AS a on a.id=e.id WHERE e.id=\'{id}\'')
 			if (data:=await cursor.fetchone()):
 				await cursor.execute(f'DELETE FROM mc_exceptions WHERE id=\'{id}\'')
-				if (server:=await self.webapi.fetch_player(nick)):
-					await self.webapi.send_signal(server,'unexceptioned',str(id))
+				try:
+					player=await self.skcrewapi.player(id)
+					await self.skcrewapi.signals(signals=[skcrew.Signal('unexceptioned',[str(id)])],servers=[player.server])
+				except:
+					pass
 				if(member:=self.bot.guild().get_member(data[0])):
 					await member.remove_roles(self.bot.guild().get_role(self.exception_role))
 					return member
