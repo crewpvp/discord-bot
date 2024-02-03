@@ -103,7 +103,7 @@ class Tickets(commands.Cog):
 				if message.content or message.embeds or message.attachments:
 					files = [discord.File(BytesIO(await attachment.read(use_cached=False)),filename=attachment.filename) for attachment in message.attachments]
 					if message.author.id not in authors:
-						authors[message.author.id] = await ticket_message.channel.create_webhook(name=str(message.author),avatar=(await message.author.avatar.read() if message.author.avatar else None))
+						authors[message.author.id] = await ticket_message.channel.create_webhook(name=message.author.name,avatar=(await message.author.avatar.read() if message.author.avatar else None))
 					await authors[message.author.id].send(wait=False,content=message.content,embeds=message.embeds,files=files,thread=thread)
 			await thread.edit(archived=True, locked=True, pinned=False)
 			await ticket_channel.delete()
@@ -210,7 +210,7 @@ class Tickets(commands.Cog):
 							if message.content or message.embeds or message.attachments:
 								files = [discord.File(BytesIO(await attachment.read(use_cached=False)),filename=attachment.filename) for attachment in message.attachments]
 								if message.author.id not in authors:
-									authors[message.author.id] = await ticket_message.channel.create_webhook(name=str(message.author),avatar=(await message.author.avatar.read() if message.author.avatar else None))
+									authors[message.author.id] = await ticket_message.channel.create_webhook(name=message.author.name,avatar=(await message.author.avatar.read() if message.author.avatar else None))
 								await authors[message.author.id].send(wait=False,content=message.content,embeds=message.embeds,files=files,thread=thread)
 						await thread.edit(archived=True, locked=True, pinned=False)
 						await ticket_channel.delete()
