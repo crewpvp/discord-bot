@@ -11,7 +11,7 @@ class Farewells(commands.Cog):
 	@commands.Cog.listener()
 	async def on_member_remove(self,member: discord.Member):
 		guild = self.bot.guild()
-		message = random.choice(self.messages).format(member=str(member))
+		message = random.choice(self.messages).format(member=member.name)
 		for channel in self.channels:
 			if (channel:=guild.get_channel(channel)):
 				await channel.send(content=message)
